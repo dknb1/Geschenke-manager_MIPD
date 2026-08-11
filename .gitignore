@@ -1,0 +1,21 @@
+# Lokale SQLite-Datenbanken
+*.db
+*.sqlite
+*.sqlite3
+
+# Umgebungsvariablen / sensible Daten
+.env
+
+# PHP-Abhängigkeiten
+vendor/
+
+# Editor
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
