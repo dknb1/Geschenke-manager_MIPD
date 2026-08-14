@@ -1,0 +1,125 @@
+body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+h2 {
+    margin-top: 40px;
+}
+
+a,
+summary {
+    display: block;
+    padding: 12px;
+    margin: 10px 0;
+    border: 1px solid #999;
+    border-radius: 6px;
+    text-decoration: none;
+    color: black;
+    cursor: pointer;
+}
+
+a:hover,
+summary:hover {
+    background-color: #eeeeee;
+}
+
+ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+li {
+    padding: 8px;
+    border-bottom: 1px solid #dddddd;
+}
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+input {
+    padding: 10px;
+    border: 1px solid #999;
+    border-radius: 6px;
+}
+
+button {
+    padding: 12px;
+    margin-top: 10px;
+    border: 1px solid #999;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #eeeeee;
+}
+
+.benachrichtigung {
+    text-align: right;
+}
+
+.glocke {
+    position: fixed;
+    top: 20px;
+    right: 25px;
+
+    width: auto;
+    padding: 5px;
+    margin: 0;
+
+    border: none;
+    background: none;
+
+    font-size: 28px;
+    cursor: pointer;
+}
+
+.benachrichtigungs-fenster {
+    width: 350px;
+
+    position: fixed;
+    top: 70px;
+    right: 25px;
+    left: auto;
+    bottom: auto;
+
+    margin: 0;
+    padding: 20px;
+
+    border: 1px solid #ccc;
+    border-radius: 10px;
+
+    background-color: white;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+}
+
+.fenster-kopf {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fenster-kopf h2 {
+    margin: 0;
+}
+
+.schliessen {
+    width: auto;
+    margin: 0;
+    padding: 5px 10px;
+
+    border: none;
+    background: none;
+
+    font-size: 22px;
+    cursor: pointer;
+}

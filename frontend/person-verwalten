@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Person verwalten</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <h1>Person verwalten</h1>
+
+    <form>
+
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" value="Max Mustermann" required>
+
+        <label for="alter">Alter:</label>
+        <input type="number" id="alter" name="alter" value="32" min="0">
+
+        <label for="geschlecht">Geschlecht:</label>
+        <select id="geschlecht" name="geschlecht">
+            <option value="maennlich" selected>Männlich</option>
+            <option value="weiblich">Weiblich</option>
+            <option value="divers">Divers</option>
+        </select>
+
+        <label for="details">Details:</label>
+        <textarea id="details" name="details" rows="5">Mag Fußball und Technik</textarea>
+
+        <button type="submit">Änderungen speichern</button>
+
+        <button type="submit">Person löschen</button>
+
+    </form>
+
+    <a href="index.html">Zurück zur Startseite</a>
+
+</body>
+
+</html>
