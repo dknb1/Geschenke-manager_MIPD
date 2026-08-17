@@ -112,6 +112,14 @@ button:hover {
     margin: 0;
 }
 
+.fehler {
+    padding: 10px 14px;
+    border: 1px solid #c0392b;
+    border-radius: 6px;
+    background-color: #fdecea;
+    color: #c0392b;
+}
+
 .schliessen {
     width: auto;
     margin: 0;

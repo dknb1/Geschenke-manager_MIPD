@@ -9,6 +9,10 @@
 # PHP-Abhängigkeiten
 vendor/
 
+# PHPUnit-Cache
+.phpunit.result.cache
+.phpunit.cache/
+
 # Editor
 .vscode/
 .idea/
@@ -19,3 +23,13 @@ Desktop.ini
 
 # macOS
 .DS_Store
+
+# Claude Code
+.claude/
+
+# Persönliche Projektdokumente (Aufgabenstellung, Meilensteine)
+my_docs/
+
+# Laufende MS4-Dokumentation (docs/) vorerst lokal, bis das Team sich auf eine
+# gemeinsame Doku-Struktur/Konvention geeinigt hat. Danach wieder entfernen.
+docs/
