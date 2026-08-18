@@ -35,7 +35,7 @@ class Datenbank
     }
 
     /**
-     * Laut Aufgabenstellung ist Weihnachten ein fester Pflichtanlass (nicht personenbezogen,
+     * Weihnachten ist ein fester Pflichtanlass (nicht personenbezogen,
      * anders als Geburtstage). Wird nur einmal angelegt, falls noch nicht vorhanden.
      */
     private static function seedStandardanlaesse(PDO $verbindung): void
