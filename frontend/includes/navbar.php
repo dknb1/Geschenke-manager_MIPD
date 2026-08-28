@@ -2,6 +2,7 @@
     <div class="navbar-logo">
         <span class="logo-icon">GM</span>
         <span class="logo-text">Geschenke-Manager</span>
+        
     </div>
 
     <div class="navbar-right">

@@ -203,3 +203,47 @@ button:hover {
 .home-button:hover {
     background-color: #555555;
 }
+
+/* Geschenkideen-Formular */
+.ideen-formular {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.ideen-formular label {
+    font-weight: bold;
+}
+
+.ideen-formular input,
+.ideen-formular select,
+.ideen-formular textarea {
+    width: 100%;
+    box-sizing: border-box;
+
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+
+    border: 1px solid #999;
+    border-radius: 6px;
+}
+
+.ideen-formular input[type="url"],
+.ideen-formular select {
+    height: 2.7rem;
+    padding: 0 0.6rem;
+}
+
+.ideen-formular textarea {
+    height: 5rem;
+    padding: 0.6rem;
+    resize: none;
+}
+
+.ideen-formular input[type="file"] {
+    padding: 0.6rem;
+}
+
+.ideen-formular button {
+    width: fit-content;
+}

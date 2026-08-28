@@ -32,7 +32,9 @@
 <a href="person-anzeigen.php">Personen anzeigen</a>
 
    
+<h2>Geschenkideen</h2>
 
+<a href="idee-speichern.php">Idee speichern</a>
 
 </div>
 
