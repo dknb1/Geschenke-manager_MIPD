@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
-
+ <?php include 'includes/navbar.php'; ?>
     <h1>Anlass bearbeiten</h1>
 
     <?php foreach ($fehler as $meldung): ?>

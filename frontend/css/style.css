@@ -1,6 +1,11 @@
 body {
     font-family: Arial, sans-serif;
     max-width: 800px;
+    width: calc(100% - 40px);
+    margin: 80px auto 40px;
+}
+.page-container {
+    max-width: 800px;
     margin: 40px auto;
     padding: 20px;
 }
@@ -68,19 +73,18 @@ button:hover {
 }
 
 .glocke {
-    position: fixed;
-    top: 20px;
-    right: 25px;
-
-    width: auto;
-    padding: 5px;
-    margin: 0;
-
-    border: none;
     background: none;
-
-    font-size: 28px;
+    border: none;
+    font-size: 1.5rem;
     cursor: pointer;
+    padding: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    line-height: 1;
+    transform: translateY(-0.15em);
 }
 
 .benachrichtigungs-fenster {
@@ -130,4 +134,72 @@ button:hover {
 
     font-size: 22px;
     cursor: pointer;
+}
+
+/* Navbar */
+.navbar {
+    height: 60px;
+    background-color: #aa9494;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0 30px;
+    border-bottom: 1px solid #b19898;
+
+    box-sizing: border-box;
+
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+}
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Linker Bereich mit Logo und Name */
+.navbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    font-size: 20px;
+    font-weight: bold;
+}
+
+/* Kleines GM-Logo */
+.logo-icon {
+    background-color: #333333;
+    color: white;
+
+    padding: 6px 9px;
+    border-radius: 5px;
+
+    font-size: 16px;
+}
+
+/* Name */
+.logo-text {
+    color: #222222;
+}
+
+/* Home-Button */
+.home-button {
+    background-color: #333333;
+    color: white;
+
+    padding: 10px 18px;
+    border-radius: 6px;
+
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* Hover-Effekt */
+.home-button:hover {
+    background-color: #555555;
 }

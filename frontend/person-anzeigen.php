@@ -11,6 +11,8 @@
 </head>
 
 <body>
+    
+ <?php include 'includes/navbar.php'; ?>
 
     <h1>Angelegte Personen</h1>
 

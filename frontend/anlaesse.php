@@ -36,7 +36,7 @@ $anlaesse = Anlass::alle();
 </head>
 
 <body>
-
+ <?php include 'includes/navbar.php'; ?>
     <h1>Meine Anlässe</h1>
 
     <?php if ($fehler): ?>

@@ -11,7 +11,8 @@
 </head>
 
 <body>
-
+ <?php include 'includes/navbar.php'; ?>
+ 
     <h1>Person anlegen</h1>
 
     <form>
