@@ -1,13 +1,35 @@
 <?php
 require_once __DIR__ . '/../backend/models/Person.php';
 
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+
+if (!$id) {
+    header('Location: person-anzeigen.php');
+    exit;
+}
+
+$person = Person::finden($id);
+
+if (!$person) {
+    header('Location: person-anzeigen.php');
+    exit;
+}
+
 $fehler = [];
-$name = '';
-$alter = '';
-$geschlecht = '';
-$details = '';
+$name = $person['name'];
+$alter = $person['alter'] !== null ? (string) $person['alter'] : '';
+$geschlecht = $person['geschlecht'] ?? '';
+$details = $person['details'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $aktion = $_POST['aktion'] ?? 'speichern';
+
+    if ($aktion === 'loeschen') {
+        Person::loeschen($id);
+        header('Location: person-anzeigen.php');
+        exit;
+    }
+
     $name = trim($_POST['name'] ?? '');
     $alter = trim($_POST['alter'] ?? '');
     $geschlecht = $_POST['geschlecht'] ?? '';
@@ -32,7 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($fehler)) {
-        Person::erstellen(
+        Person::aktualisieren(
+            $id,
             $name,
             $alter !== '' ? (int) $alter : null,
             $geschlecht !== '' ? $geschlecht : null,
@@ -50,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Person anlegen</title>
+    <title>Person verwalten</title>
 
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -58,13 +81,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
  <?php include 'includes/navbar.php'; ?>
 
-    <h1>Person anlegen</h1>
+    <h1>Person verwalten</h1>
 
     <?php foreach ($fehler as $meldung): ?>
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
     <?php endforeach; ?>
 
     <form method="post">
+
+        <input type="hidden" name="id" value="<?= (int) $id ?>">
 
         <label for="name">Name:</label>
         <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" maxlength="100" required>
@@ -83,7 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label for="details">Details:</label>
         <textarea id="details" name="details" rows="5" maxlength="1000"><?= htmlspecialchars($details) ?></textarea>
 
-        <button type="submit">Person speichern</button>
+        <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
+
+        <button type="submit" name="aktion" value="loeschen">Person löschen</button>
 
     </form>
 

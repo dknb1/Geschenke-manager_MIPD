@@ -14,3 +14,15 @@ CREATE TABLE IF NOT EXISTS anlaesse (
     geschuetzt INTEGER NOT NULL DEFAULT 0,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Personen (Anforderung A-01 "Personen anlegen").
+-- "alter" ist ein SQL-Schluesselwort (siehe ALTER TABLE) und wird deshalb in allen
+-- Statements in doppelten Anfuehrungszeichen verwendet, um Parserfehler zu vermeiden.
+CREATE TABLE IF NOT EXISTS personen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    "alter" INTEGER,
+    geschlecht TEXT,
+    details TEXT,
+    erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
