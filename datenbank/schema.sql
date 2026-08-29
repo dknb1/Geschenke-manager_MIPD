@@ -26,3 +26,18 @@ CREATE TABLE IF NOT EXISTS personen (
     details TEXT,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Geschenkideen (Anforderung A-03 "Ideen speichern").
+-- Eine Idee gehoert immer zu genau einer Person und kann als Text, Link
+-- und/oder Bild angegeben werden (mindestens eines der drei, siehe
+-- Geschenkidee::hatInhalt()). Bilder werden bewusst nicht als Datei/BLOB
+-- abgelegt, sondern nur als URL referenziert (bild_link) - kein
+-- Datei-Upload/Speicherplatz auf dem Server noetig.
+CREATE TABLE IF NOT EXISTS geschenkideen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id INTEGER NOT NULL REFERENCES personen(id),
+    text TEXT,
+    link TEXT,
+    bild_link TEXT,
+    erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+);

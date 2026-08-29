@@ -240,10 +240,25 @@ button:hover {
     resize: none;
 }
 
-.ideen-formular input[type="file"] {
-    padding: 0.6rem;
-}
-
 .ideen-formular button {
     width: fit-content;
+}
+
+/* Liste der gespeicherten Geschenkideen */
+.ideen-liste {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.ideen-liste li {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
 }
