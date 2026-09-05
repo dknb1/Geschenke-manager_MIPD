@@ -246,8 +246,6 @@ button:hover {
 
 .ideen-formular button {
     width: fit-content;
-<<<<<<< HEAD
-=======
 }
 
 /* Liste der gespeicherten Geschenkideen */
@@ -331,5 +329,4 @@ button:hover {
 
     border-radius: 7px;
     box-sizing: border-box;
->>>>>>> 81f9a02 (Benachrichtigungseinstellungen hinzugefügt)
 }

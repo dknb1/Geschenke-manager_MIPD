@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS anlaesse (
     geschuetzt INTEGER NOT NULL DEFAULT 0,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
-<<<<<<< HEAD
-=======
 
 -- Personen (Anforderung A-01 "Personen anlegen").
 -- "alter" ist ein SQL-Schluesselwort (siehe ALTER TABLE) und wird deshalb in allen
@@ -50,4 +48,3 @@ CREATE TABLE IF NOT EXISTS einstellungen (
 
 INSERT OR IGNORE INTO einstellungen (name, wert)
 VALUES ('benachrichtigung_tage', '30');
->>>>>>> 81f9a02 (Benachrichtigungseinstellungen hinzugefügt)
