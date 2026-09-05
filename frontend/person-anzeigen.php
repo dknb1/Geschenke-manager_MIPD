@@ -1,3 +1,8 @@
+<?php
+require_once __DIR__ . '/../backend/models/Person.php';
+
+$personen = Person::alle();
+?>
 <!DOCTYPE html>
 <html lang="de">
 
@@ -11,18 +16,20 @@
 </head>
 
 <body>
-    
  <?php include 'includes/navbar.php'; ?>
 
     <h1>Angelegte Personen</h1>
 
-    <a href="person-verwalten.html">Max</a>
+    <?php if (empty($personen)): ?>
+        <p>Es wurden noch keine Personen angelegt.</p>
+    <?php else: ?>
+        <?php foreach ($personen as $person): ?>
+            <a href="person-bearbeiten.php?id=<?= (int) $person['id'] ?>"><?= htmlspecialchars($person['name']) ?></a>
+        <?php endforeach; ?>
+    <?php endif; ?>
 
-    <a href="person-verwalten.html">Anna</a>
+    <a href="person-anlegen.php">Neue Person anlegen</a>
 
-    <a href="person-verwalten.html">Peter</a>
-
-   
 </body>
 
 </html>

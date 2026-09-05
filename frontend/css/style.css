@@ -240,10 +240,6 @@ button:hover {
     resize: none;
 }
 
-.ideen-formular input[type="file"] {
-    padding: 0.6rem;
-}
-
 .ideen-formular button {
     width: fit-content;
 }
