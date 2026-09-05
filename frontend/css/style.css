@@ -246,4 +246,90 @@ button:hover {
 
 .ideen-formular button {
     width: fit-content;
+<<<<<<< HEAD
+=======
+}
+
+/* Liste der gespeicherten Geschenkideen */
+.ideen-liste {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.ideen-liste li {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
+}
+
+.fenster-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.einstellungen-button {
+    width: 34px;
+    height: 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: 0;
+    padding: 0;
+
+    border: none;
+    border-radius: 50%;
+
+    background: transparent;
+    color: #333333;
+
+    font-size: 20px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition: background-color 0.2s ease;
+}
+
+
+.einstellungen-button:hover {
+    background-color: #eeeeee;
+}
+
+.glocke {
+    position: relative;
+}
+
+.glocke .benachrichtigungs-anzahl {
+    position: absolute;
+    top: -4px;
+    right: -6px;
+
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background-color: #8f7a7a;
+    color: white;
+
+    font-size: 9px;
+    font-weight: bold;
+    line-height: 14px;
+
+    border-radius: 7px;
+    box-sizing: border-box;
+>>>>>>> 81f9a02 (Benachrichtigungseinstellungen hinzugefügt)
 }

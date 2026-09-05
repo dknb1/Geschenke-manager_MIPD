@@ -14,3 +14,40 @@ CREATE TABLE IF NOT EXISTS anlaesse (
     geschuetzt INTEGER NOT NULL DEFAULT 0,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
+<<<<<<< HEAD
+=======
+
+-- Personen (Anforderung A-01 "Personen anlegen").
+-- "alter" ist ein SQL-Schluesselwort (siehe ALTER TABLE) und wird deshalb in allen
+-- Statements in doppelten Anfuehrungszeichen verwendet, um Parserfehler zu vermeiden.
+CREATE TABLE IF NOT EXISTS personen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    "alter" INTEGER,
+    geschlecht TEXT,
+    details TEXT,
+    erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Geschenkideen (Anforderung A-03 "Ideen speichern").
+-- Eine Idee gehoert immer zu genau einer Person und kann als Text, Link
+-- und/oder Bild angegeben werden (mindestens eines der drei, siehe
+-- Geschenkidee::hatInhalt()). Bilder werden bewusst nicht als Datei/BLOB
+-- abgelegt, sondern nur als URL referenziert (bild_link) - kein
+-- Datei-Upload/Speicherplatz auf dem Server noetig.
+CREATE TABLE IF NOT EXISTS geschenkideen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id INTEGER NOT NULL REFERENCES personen(id),
+    text TEXT,
+    link TEXT,
+    bild_link TEXT,
+    erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS einstellungen (
+    name TEXT PRIMARY KEY,
+    wert TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO einstellungen (name, wert)
+VALUES ('benachrichtigung_tage', '30');
+>>>>>>> 81f9a02 (Benachrichtigungseinstellungen hinzugefügt)
