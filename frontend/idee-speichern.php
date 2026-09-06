@@ -140,11 +140,15 @@ $ideen = Geschenkidee::alle();
                             (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
                         <?php endif; ?>
                     </a>
-                    <?php if (!empty($idee['link'])): ?>
-                        <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
-                    <?php endif; ?>
-                    <?php if (!empty($idee['bild_link'])): ?>
-                        <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
+                    <?php if (!empty($idee['link']) || !empty($idee['bild_link'])): ?>
+                        <div class="ideen-liste-extras">
+                            <?php if (!empty($idee['link'])): ?>
+                                <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
+                            <?php endif; ?>
+                            <?php if (!empty($idee['bild_link'])): ?>
+                                <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                 </li>
             <?php endforeach; ?>
