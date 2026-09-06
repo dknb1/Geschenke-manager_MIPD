@@ -59,3 +59,16 @@ CREATE TABLE IF NOT EXISTS anlass_personen (
     person_id INTEGER NOT NULL REFERENCES personen(id) ON DELETE CASCADE,
     PRIMARY KEY (anlass_id, person_id)
 );
+
+-- Verknuepfung Geschenkideen <-> Anlaesse (N:M, analog zu anlass_personen oben) - eine Idee
+-- kann zu mehreren Anlaessen passen (z. B. sowohl als Weihnachts- als auch als
+-- Geburtstagsgeschenk geeignet), und ein Anlass hat i. d. R. mehrere Ideen.
+-- ON DELETE CASCADE auf beiden Seiten: Loeschen einer Idee oder eines Anlasses entfernt nur
+-- die Verknuepfungszeile, nicht die jeweils andere Seite - eine Idee bleibt also erhalten,
+-- wenn der verknuepfte Anlass geloescht wird, verliert dabei nur die Anlass-Zuordnung.
+-- Setzt PRAGMA foreign_keys = ON voraus (siehe Datenbank::neueVerbindung()).
+CREATE TABLE IF NOT EXISTS geschenkidee_anlaesse (
+    geschenkidee_id INTEGER NOT NULL REFERENCES geschenkideen(id) ON DELETE CASCADE,
+    anlass_id INTEGER NOT NULL REFERENCES anlaesse(id) ON DELETE CASCADE,
+    PRIMARY KEY (geschenkidee_id, anlass_id)
+);

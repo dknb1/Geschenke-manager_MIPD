@@ -155,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (!empty($idee['bild_link'])): ?>
                         <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
                     <?php endif; ?>
+                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">Bearbeiten</a>
                 </li>
             <?php endforeach; ?>
         </ul>

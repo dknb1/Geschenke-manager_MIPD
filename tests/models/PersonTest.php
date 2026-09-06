@@ -176,6 +176,7 @@ final class PersonTest extends TestCase
     {
         $this->assertFalse(Person::istGueltigeDetails("Test'; DROP TABLE personen;--"));
         $this->assertFalse(Person::istGueltigeDetails('SELECT * FROM personen'));
+        $this->assertFalse(Person::istGueltigeDetails('UPDATE personen SET name = 1'));
         $this->assertFalse(Person::istGueltigeDetails(str_repeat('a', 1001)));
     }
 
@@ -183,5 +184,11 @@ final class PersonTest extends TestCase
     {
         $this->assertTrue(Person::istGueltigeDetails('Mag Bücher und Wandern.'));
         $this->assertTrue(Person::istGueltigeDetails(''));
+        // Alltagswoerter, die zufaellig wie SQL-Schluesselwoerter aussehen bzw. sie als
+        // Teilzeichenkette enthalten, duerfen nicht faelschlich abgelehnt werden.
+        $this->assertTrue(Person::istGueltigeDetails('Ihr Alter ist 30 Jahre'));
+        $this->assertTrue(Person::istGueltigeDetails('Interessiert sich für die Europäische Union'));
+        $this->assertTrue(Person::istGueltigeDetails('Nutzt Dropbox zum Teilen von Fotos'));
+        $this->assertTrue(Person::istGueltigeDetails('Mag eine große Selection an Farben'));
     }
 }

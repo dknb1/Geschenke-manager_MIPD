@@ -3,6 +3,7 @@
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../backend/models/Person.php';
+require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Geschenkidee.php';
 
 final class GeschenkideeTest extends TestCase
@@ -27,6 +28,28 @@ final class GeschenkideeTest extends TestCase
         }
 
         $this->fail("Person mit Namen '$name' wurde nicht gefunden.");
+    }
+
+    private function findeIdeeNachText(string $text): array
+    {
+        foreach (Geschenkidee::alle() as $idee) {
+            if ($idee['text'] === $text) {
+                return $idee;
+            }
+        }
+
+        $this->fail("Geschenkidee mit Text '$text' wurde nicht gefunden.");
+    }
+
+    private function findeAnlassNachName(string $name): array
+    {
+        foreach (Anlass::alle() as $anlass) {
+            if ($anlass['name'] === $name) {
+                return $anlass;
+            }
+        }
+
+        $this->fail("Anlass mit Namen '$name' wurde nicht gefunden.");
     }
 
     public function testErstellenUndAlle(): void
@@ -81,7 +104,20 @@ final class GeschenkideeTest extends TestCase
     {
         $this->assertTrue(Geschenkidee::istGueltigerText('Ein schönes Buch'));
         $this->assertFalse(Geschenkidee::istGueltigerText("Idee'; DROP TABLE geschenkideen; --"));
+        $this->assertFalse(Geschenkidee::istGueltigerText('UPDATE geschenkideen SET text = 1'));
         $this->assertFalse(Geschenkidee::istGueltigerText(str_repeat('a', 1001)));
+    }
+
+    public function testIstGueltigerTextAkzeptiertAlltagswoerter(): void
+    {
+        // "Union" ist ein zu gebraeuchliches Alltagswort und deshalb nicht mehr in der
+        // Denylist (siehe Geschenkidee::SQL_SCHLUESSELWOERTER). "UPDATE" bleibt dagegen
+        // bewusst denylisted, auch wenn "Update" ebenfalls ein Alltagswort ist - siehe
+        // testIstGueltigerTextLehntSqlSchluesselwoerterAb().
+        $this->assertTrue(Geschenkidee::istGueltigerText('Ein Buch über die Europäische Union'));
+        // "Dropbox" enthaelt "DROP" nur als Teilzeichenkette, nicht als eigenstaendiges Wort -
+        // die \b-Wortgrenzen duerfen das nicht faelschlich ablehnen.
+        $this->assertTrue(Geschenkidee::istGueltigerText('Ein Dropbox-Abo'));
     }
 
     public function testIstGueltigeUrlPrueftFormatUndErlaubtLeer(): void
@@ -89,5 +125,88 @@ final class GeschenkideeTest extends TestCase
         $this->assertTrue(Geschenkidee::istGueltigeUrl(''));
         $this->assertTrue(Geschenkidee::istGueltigeUrl('https://example.com/artikel'));
         $this->assertFalse(Geschenkidee::istGueltigeUrl('kein-link'));
+    }
+
+    public function testFindenGibtNullZurueckWennNichtVorhanden(): void
+    {
+        $this->assertNull(Geschenkidee::finden(999));
+    }
+
+    public function testAktualisierenAendertWerte(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+        Geschenkidee::erstellen($personId, 'Alte Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Alte Idee')['id'];
+
+        Geschenkidee::aktualisieren($id, $personId, 'Neue Idee', 'https://example.com', null);
+
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertSame('Neue Idee', $aktualisiert['text']);
+        $this->assertSame('https://example.com', $aktualisiert['link']);
+    }
+
+    public function testLoeschenEntferntEintrag(): void
+    {
+        $personId = $this->testPersonAnlegen();
+        Geschenkidee::erstellen($personId, 'Zu löschen', null, null);
+        $id = (int) $this->findeIdeeNachText('Zu löschen')['id'];
+
+        $erfolg = Geschenkidee::loeschen($id);
+
+        $this->assertTrue($erfolg);
+        $this->assertNull(Geschenkidee::finden($id));
+    }
+
+    public function testLoeschenGibtFalseZurueckWennNichtVorhanden(): void
+    {
+        $this->assertFalse(Geschenkidee::loeschen(999));
+    }
+
+    public function testErstellenVerknuepftMehrereAnlaesse(): void
+    {
+        $personId = $this->testPersonAnlegen();
+        Anlass::erstellen('Geburtstagsfeier', '2026-06-01', true, []);
+        Anlass::erstellen('Jubiläum', '2026-07-01', true, []);
+        $anlass1 = (int) $this->findeAnlassNachName('Geburtstagsfeier')['id'];
+        $anlass2 = (int) $this->findeAnlassNachName('Jubiläum')['id'];
+
+        Geschenkidee::erstellen($personId, 'Mehrfach-Idee', null, null, [$anlass1, $anlass2]);
+        $id = (int) $this->findeIdeeNachText('Mehrfach-Idee')['id'];
+
+        $namen = array_column(Geschenkidee::anlaesse($id), 'name');
+        sort($namen);
+        $this->assertSame(['Geburtstagsfeier', 'Jubiläum'], $namen);
+    }
+
+    public function testAktualisierenErsetztAnlassVerknuepfungKomplett(): void
+    {
+        $personId = $this->testPersonAnlegen();
+        Anlass::erstellen('Anlass A', '2026-06-01', true, []);
+        Anlass::erstellen('Anlass B', '2026-07-01', true, []);
+        $anlassA = (int) $this->findeAnlassNachName('Anlass A')['id'];
+        $anlassB = (int) $this->findeAnlassNachName('Anlass B')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee mit Anlass A', null, null, [$anlassA]);
+        $id = (int) $this->findeIdeeNachText('Idee mit Anlass A')['id'];
+
+        Geschenkidee::aktualisieren($id, $personId, 'Idee mit Anlass A', null, null, [$anlassB]);
+
+        $namen = array_column(Geschenkidee::anlaesse($id), 'name');
+        $this->assertSame(['Anlass B'], $namen);
+    }
+
+    public function testLoeschenDesAnlassesEntferntNurDieVerknuepfungNichtDieIdee(): void
+    {
+        $personId = $this->testPersonAnlegen();
+        Anlass::erstellen('Vergänglicher Anlass', '2026-06-01', true, []);
+        $anlassId = (int) $this->findeAnlassNachName('Vergänglicher Anlass')['id'];
+
+        Geschenkidee::erstellen($personId, 'Bleibt bestehen', null, null, [$anlassId]);
+        $id = (int) $this->findeIdeeNachText('Bleibt bestehen')['id'];
+
+        Anlass::loeschen($anlassId);
+
+        $this->assertNotNull(Geschenkidee::finden($id));
+        $this->assertCount(0, Geschenkidee::anlaesse($id));
     }
 }

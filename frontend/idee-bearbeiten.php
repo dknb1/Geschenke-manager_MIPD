@@ -3,14 +3,36 @@ require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+
+if (!$id) {
+    header('Location: idee-speichern.php');
+    exit;
+}
+
+$idee = Geschenkidee::finden($id);
+
+if (!$idee) {
+    header('Location: idee-speichern.php');
+    exit;
+}
+
 $fehler = [];
-$personId = '';
-$text = '';
-$link = '';
-$bildLink = '';
-$anlassIds = [];
+$personId = (string) $idee['person_id'];
+$text = $idee['text'] ?? '';
+$link = $idee['link'] ?? '';
+$bildLink = $idee['bild_link'] ?? '';
+$anlassIds = array_map('intval', array_column(Geschenkidee::anlaesse($id), 'id'));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $aktion = $_POST['aktion'] ?? 'speichern';
+
+    if ($aktion === 'loeschen') {
+        Geschenkidee::loeschen($id);
+        header('Location: idee-speichern.php');
+        exit;
+    }
+
     $personId = trim($_POST['person'] ?? '');
     $text = trim($_POST['text'] ?? '');
     $link = trim($_POST['link'] ?? '');
@@ -44,7 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($fehler)) {
-        Geschenkidee::erstellen(
+        Geschenkidee::aktualisieren(
+            $id,
             (int) $personId,
             $text !== '' ? $text : null,
             $link !== '' ? $link : null,
@@ -58,7 +81,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $personen = Person::alle();
 $anlaesse = Anlass::alle();
-$ideen = Geschenkidee::alle();
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -69,20 +91,22 @@ $ideen = Geschenkidee::alle();
 
     <link rel="stylesheet" href="css/style.css">
 
-    <title>Geschenkidee speichern</title>
+    <title>Geschenkidee bearbeiten</title>
 </head>
 
 <body>
 
     <?php include 'includes/navbar.php'; ?>
 
-    <h1>Geschenkidee speichern</h1>
+    <h1>Geschenkidee bearbeiten</h1>
 
     <?php foreach ($fehler as $meldung): ?>
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
     <?php endforeach; ?>
 
     <form class="ideen-formular" method="post">
+
+        <input type="hidden" name="id" value="<?= (int) $id ?>">
 
         <label for="person">Person:</label>
         <select id="person" name="person">
@@ -110,37 +134,13 @@ $ideen = Geschenkidee::alle();
             <?php endforeach; ?>
         </select>
 
-        <button type="submit">Idee speichern</button>
+        <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
+
+        <button type="submit" name="aktion" value="loeschen">Idee löschen</button>
 
     </form>
 
-    <h2>Gespeicherte Ideen</h2>
-
-    <?php if (empty($ideen)): ?>
-        <p>Es wurden noch keine Geschenkideen gespeichert.</p>
-    <?php else: ?>
-        <ul class="ideen-liste">
-            <?php foreach ($ideen as $idee): ?>
-                <?php $verknuepfteAnlaesse = Geschenkidee::anlaesse((int) $idee['id']); ?>
-                <li>
-                    <strong><?= htmlspecialchars($idee['person_name']) ?>:</strong>
-                    <?php if (!empty($idee['text'])): ?>
-                        <?= htmlspecialchars($idee['text']) ?>
-                    <?php endif; ?>
-                    <?php if (!empty($idee['link'])): ?>
-                        <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
-                    <?php endif; ?>
-                    <?php if (!empty($idee['bild_link'])): ?>
-                        <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
-                    <?php endif; ?>
-                    <?php if (!empty($verknuepfteAnlaesse)): ?>
-                        (<?= htmlspecialchars(implode(', ', array_column($verknuepfteAnlaesse, 'name'))) ?>)
-                    <?php endif; ?>
-                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">Bearbeiten</a>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
+    <a href="idee-speichern.php">Zurück zu den Geschenkideen</a>
 
 </body>
 

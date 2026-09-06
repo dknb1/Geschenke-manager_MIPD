@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../config/Datenbank.php';
+require_once __DIR__ . '/Anlass.php';
 
 class Geschenkidee
 {
@@ -9,11 +10,17 @@ class Geschenkidee
      * Person::enthaeltSqlSchluesselwort() - zweite Verteidigungslinie
      * zusaetzlich zu den parametrisierten Queries unten (Anforderung:
      * "Eingabefelder duerfen keine SQL-Schluesselwoerter akzeptieren").
+     * ALTER und UNION bewusst nicht enthalten - beides sind zu gebraeuchliche
+     * Alltagswoerter ("Alter" = Lebensalter, "Union" z. B. in Buch-/Filmtiteln),
+     * die hier staendig faelschlich abgelehnt wuerden. Die eigentliche
+     * Injection-Verhinderung leisten ohnehin die parametrisierten Queries.
      */
     private const SQL_SCHLUESSELWOERTER = [
-        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'UNION', 'EXEC',
-        'TRUNCATE', 'CREATE TABLE', '--', ';', '/*', '*/',
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'EXEC',
+        'TRUNCATE', 'CREATE TABLE',
     ];
+
+    private const SQL_SONDERZEICHEN = ['--', ';', '/*', '*/'];
 
     public static function alle(): array
     {
@@ -27,6 +34,15 @@ class Geschenkidee
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public static function finden(int $id): ?array
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare('SELECT * FROM geschenkideen WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        $idee = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $idee !== false ? $idee : null;
+    }
+
     public static function vonPerson(int $personId): array
     {
         $pdo = Datenbank::verbinden();
@@ -37,7 +53,11 @@ class Geschenkidee
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function erstellen(int $personId, ?string $text, ?string $link, ?string $bildLink): void
+    /**
+     * @param int[] $anlassIds IDs der Anlaesse, zu denen diese Idee passt (kann leer sein -
+     *                         eine Idee muss nicht zwingend einem Anlass zugeordnet sein)
+     */
+    public static function erstellen(int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = []): void
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
@@ -50,6 +70,87 @@ class Geschenkidee
             'link' => $link,
             'bild_link' => $bildLink,
         ]);
+
+        self::anlaesseVerknuepfen($pdo, (int) $pdo->lastInsertId(), $anlassIds);
+    }
+
+    /**
+     * @param int[] $anlassIds
+     */
+    public static function aktualisieren(int $id, int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = []): void
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'UPDATE geschenkideen
+             SET person_id = :person_id, text = :text, link = :link, bild_link = :bild_link
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'person_id' => $personId,
+            'text' => $text,
+            'link' => $link,
+            'bild_link' => $bildLink,
+            'id' => $id,
+        ]);
+
+        self::anlaesseVerknuepfen($pdo, $id, $anlassIds);
+    }
+
+    public static function loeschen(int $id): bool
+    {
+        if (self::finden($id) === null) {
+            return false;
+        }
+
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare('DELETE FROM geschenkideen WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+
+        return true;
+    }
+
+    /**
+     * Ersetzt die komplette Anlass-Verknuepfung einer Idee durch $anlassIds (loeschen + neu
+     * anlegen statt Diff, analog zu Anlass::personenVerknuepfen() - die Mengen im
+     * Prototyp-Umfang sind klein).
+     *
+     * @param int[] $anlassIds
+     */
+    private static function anlaesseVerknuepfen(PDO $pdo, int $geschenkideeId, array $anlassIds): void
+    {
+        $pdo->prepare('DELETE FROM geschenkidee_anlaesse WHERE geschenkidee_id = :geschenkidee_id')
+            ->execute(['geschenkidee_id' => $geschenkideeId]);
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO geschenkidee_anlaesse (geschenkidee_id, anlass_id) VALUES (:geschenkidee_id, :anlass_id)'
+        );
+        foreach (array_unique($anlassIds) as $anlassId) {
+            $stmt->execute(['geschenkidee_id' => $geschenkideeId, 'anlass_id' => $anlassId]);
+        }
+    }
+
+    /**
+     * Alle Anlaesse, denen diese Idee zugeordnet ist, sortiert nach naechstem Vorkommen
+     * (nutzt Anlass::naechstesVorkommen(), analog zu Anlass::vonPerson()).
+     */
+    public static function anlaesse(int $geschenkideeId): array
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'SELECT anlaesse.*
+             FROM geschenkidee_anlaesse
+             JOIN anlaesse ON anlaesse.id = geschenkidee_anlaesse.anlass_id
+             WHERE geschenkidee_anlaesse.geschenkidee_id = :geschenkidee_id'
+        );
+        $stmt->execute(['geschenkidee_id' => $geschenkideeId]);
+        $anlaesse = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        usort(
+            $anlaesse,
+            fn (array $a, array $b) => Anlass::naechstesVorkommen($a) <=> Anlass::naechstesVorkommen($b)
+        );
+
+        return $anlaesse;
     }
 
     /**
@@ -76,12 +177,21 @@ class Geschenkidee
         return $url === '' || (strlen($url) <= 2000 && filter_var($url, FILTER_VALIDATE_URL) !== false);
     }
 
+    /**
+     * Sucht die Schluesselwoerter als eigenstaendige Woerter (\b-Wortgrenzen), nicht als
+     * blosse Teilzeichenkette - sonst wuerden z. B. "Dropbox" oder "Selection" faelschlich
+     * abgelehnt, obwohl sie SELECT/DROP nur als Teil eines laengeren Wortes enthalten.
+     */
     public static function enthaeltSqlSchluesselwort(string $eingabe): bool
     {
-        $obenGross = strtoupper($eingabe);
-
         foreach (self::SQL_SCHLUESSELWOERTER as $schluesselwort) {
-            if (str_contains($obenGross, $schluesselwort)) {
+            if (preg_match('/\b' . preg_quote($schluesselwort, '/') . '\b/i', $eingabe) === 1) {
+                return true;
+            }
+        }
+
+        foreach (self::SQL_SONDERZEICHEN as $zeichen) {
+            if (str_contains($eingabe, $zeichen)) {
                 return true;
             }
         }
