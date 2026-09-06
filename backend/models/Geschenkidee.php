@@ -3,26 +3,10 @@
 require_once __DIR__ . '/../config/Datenbank.php';
 require_once __DIR__ . '/Anlass.php';
 require_once __DIR__ . '/Person.php';
+require_once __DIR__ . '/SqlDenylist.php';
 
 class Geschenkidee
 {
-    /**
-     * Statement-Schluesselwoerter fuer das Freitextfeld "text", analog zu
-     * Person::enthaeltSqlSchluesselwort() - zweite Verteidigungslinie
-     * zusaetzlich zu den parametrisierten Queries unten (Anforderung:
-     * "Eingabefelder duerfen keine SQL-Schluesselwoerter akzeptieren").
-     * ALTER und UNION bewusst nicht enthalten - beides sind zu gebraeuchliche
-     * Alltagswoerter ("Alter" = Lebensalter, "Union" z. B. in Buch-/Filmtiteln),
-     * die hier staendig faelschlich abgelehnt wuerden. Die eigentliche
-     * Injection-Verhinderung leisten ohnehin die parametrisierten Queries.
-     */
-    private const SQL_SCHLUESSELWOERTER = [
-        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'EXEC',
-        'TRUNCATE', 'CREATE TABLE',
-    ];
-
-    private const SQL_SONDERZEICHEN = ['--', ';', '/*', '*/'];
-
     public static function alle(): array
     {
         $pdo = Datenbank::verbinden();
@@ -229,15 +213,7 @@ class Geschenkidee
      */
     private static function anlaesseVerknuepfen(PDO $pdo, int $geschenkideeId, array $anlassIds): void
     {
-        $pdo->prepare('DELETE FROM geschenkidee_anlaesse WHERE geschenkidee_id = :geschenkidee_id')
-            ->execute(['geschenkidee_id' => $geschenkideeId]);
-
-        $stmt = $pdo->prepare(
-            'INSERT INTO geschenkidee_anlaesse (geschenkidee_id, anlass_id) VALUES (:geschenkidee_id, :anlass_id)'
-        );
-        foreach (array_unique($anlassIds) as $anlassId) {
-            $stmt->execute(['geschenkidee_id' => $geschenkideeId, 'anlass_id' => $anlassId]);
-        }
+        Datenbank::ersetzeVerknuepfung($pdo, 'geschenkidee_anlaesse', 'geschenkidee_id', $geschenkideeId, 'anlass_id', $anlassIds);
     }
 
     /**
@@ -340,7 +316,7 @@ class Geschenkidee
 
     public static function istGueltigerText(string $text): bool
     {
-        return $text === '' || (strlen($text) <= 1000 && !self::enthaeltSqlSchluesselwort($text));
+        return $text === '' || (strlen($text) <= 1000 && !SqlDenylist::enthaeltSchluesselwort($text));
     }
 
     /**
@@ -353,24 +329,38 @@ class Geschenkidee
     }
 
     /**
-     * Sucht die Schluesselwoerter als eigenstaendige Woerter (\b-Wortgrenzen), nicht als
-     * blosse Teilzeichenkette - sonst wuerden z. B. "Dropbox" oder "Selection" faelschlich
-     * abgelehnt, obwohl sie SELECT/DROP nur als Teil eines laengeren Wortes enthalten.
+     * Buendelt die Validierung von Person/Text/Link/Bild-Link fuer erstellen()/aktualisieren()
+     * in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) - zentrale Stelle statt
+     * dieselbe Pruefungs-/Fehlertext-Kette in idee-speichern.php und idee-bearbeiten.php
+     * dupliziert zu pflegen.
+     *
+     * @param ?array $person Bereits aufgeloeste Person (Person::finden()) oder null, falls
+     *                       keine/keine gueltige Person ausgewaehlt wurde
      */
-    public static function enthaeltSqlSchluesselwort(string $eingabe): bool
+    public static function validiereEingabe(?array $person, string $text, string $link, string $bildLink): array
     {
-        foreach (self::SQL_SCHLUESSELWOERTER as $schluesselwort) {
-            if (preg_match('/\b' . preg_quote($schluesselwort, '/') . '\b/i', $eingabe) === 1) {
-                return true;
-            }
+        $fehler = [];
+
+        if ($person === null) {
+            $fehler[] = 'Bitte eine Person auswählen.';
         }
 
-        foreach (self::SQL_SONDERZEICHEN as $zeichen) {
-            if (str_contains($eingabe, $zeichen)) {
-                return true;
-            }
+        if (!self::hatInhalt($text, $link, $bildLink)) {
+            $fehler[] = 'Bitte mindestens einen Inhalt angeben: Text, Link oder Bild.';
         }
 
-        return false;
+        if (!self::istGueltigerText($text)) {
+            $fehler[] = 'Die Idee enthält nicht erlaubte Inhalte oder ist zu lang (max. 1000 Zeichen).';
+        }
+
+        if (!self::istGueltigeUrl($link)) {
+            $fehler[] = 'Bitte einen gültigen Link angeben (z. B. https://...).';
+        }
+
+        if (!self::istGueltigeUrl($bildLink)) {
+            $fehler[] = 'Bitte einen gültigen Bild-Link angeben (z. B. https://...).';
+        }
+
+        return $fehler;
     }
 }

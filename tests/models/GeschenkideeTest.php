@@ -1,18 +1,12 @@
 <?php
 
-use PHPUnit\Framework\TestCase;
-
+require_once __DIR__ . '/../ModelTestCase.php';
 require_once __DIR__ . '/../../backend/models/Person.php';
 require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Geschenkidee.php';
 
-final class GeschenkideeTest extends TestCase
+final class GeschenkideeTest extends ModelTestCase
 {
-    protected function setUp(): void
-    {
-        Datenbank::fuerTests();
-    }
-
     private function testPersonAnlegen(string $name = 'Anna'): int
     {
         Person::erstellen($name, '2000-01-01', null, null);
@@ -21,35 +15,17 @@ final class GeschenkideeTest extends TestCase
 
     private function findePersonNachName(string $name): array
     {
-        foreach (Person::alle() as $person) {
-            if ($person['name'] === $name) {
-                return $person;
-            }
-        }
-
-        $this->fail("Person mit Namen '$name' wurde nicht gefunden.");
+        return $this->findeInListe(Person::alle(), 'name', $name);
     }
 
     private function findeIdeeNachText(string $text): array
     {
-        foreach (Geschenkidee::alle() as $idee) {
-            if ($idee['text'] === $text) {
-                return $idee;
-            }
-        }
-
-        $this->fail("Geschenkidee mit Text '$text' wurde nicht gefunden.");
+        return $this->findeInListe(Geschenkidee::alle(), 'text', $text);
     }
 
     private function findeAnlassNachName(string $name): array
     {
-        foreach (Anlass::alle() as $anlass) {
-            if ($anlass['name'] === $name) {
-                return $anlass;
-            }
-        }
-
-        $this->fail("Anlass mit Namen '$name' wurde nicht gefunden.");
+        return $this->findeInListe(Anlass::alle(), 'name', $name);
     }
 
     public function testErstellenUndAlle(): void
@@ -111,7 +87,7 @@ final class GeschenkideeTest extends TestCase
     public function testIstGueltigerTextAkzeptiertAlltagswoerter(): void
     {
         // "Union" ist ein zu gebraeuchliches Alltagswort und deshalb nicht mehr in der
-        // Denylist (siehe Geschenkidee::SQL_SCHLUESSELWOERTER). "UPDATE" bleibt dagegen
+        // Denylist (siehe SqlDenylist). "UPDATE" bleibt dagegen
         // bewusst denylisted, auch wenn "Update" ebenfalls ein Alltagswort ist - siehe
         // testIstGueltigerTextLehntSqlSchluesselwoerterAb().
         $this->assertTrue(Geschenkidee::istGueltigerText('Ein Buch über die Europäische Union'));
@@ -421,5 +397,31 @@ final class GeschenkideeTest extends TestCase
         $this->assertFalse(Geschenkidee::istFest($aktualisiert));
         $this->assertSame(0, (int) $aktualisiert['geschenk_fuer_geburtstag']);
         $this->assertNull($aktualisiert['geschenk_datum']);
+    }
+
+    public function testValidiereEingabeLiefertLeereListeBeiGueltigenWerten(): void
+    {
+        $person = ['id' => 1, 'name' => 'Anna'];
+
+        $fehler = Geschenkidee::validiereEingabe($person, 'Ein Buch', '', '');
+
+        $this->assertSame([], $fehler);
+    }
+
+    public function testValidiereEingabeLehntFehlendePersonUndFehlendenInhaltAb(): void
+    {
+        $fehler = Geschenkidee::validiereEingabe(null, '', '', '');
+
+        $this->assertContains('Bitte eine Person auswählen.', $fehler);
+        $this->assertContains('Bitte mindestens einen Inhalt angeben: Text, Link oder Bild.', $fehler);
+    }
+
+    public function testValidiereEingabeLehntUngueltigenLinkAb(): void
+    {
+        $person = ['id' => 1, 'name' => 'Anna'];
+
+        $fehler = Geschenkidee::validiereEingabe($person, 'Text', 'kein-link', '');
+
+        $this->assertContains('Bitte einen gültigen Link angeben (z. B. https://...).', $fehler);
     }
 }

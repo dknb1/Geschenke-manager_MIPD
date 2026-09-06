@@ -1,38 +1,20 @@
 <?php
 
-use PHPUnit\Framework\TestCase;
-
+require_once __DIR__ . '/../ModelTestCase.php';
 require_once __DIR__ . '/../../backend/models/Person.php';
 require_once __DIR__ . '/../../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../../backend/models/Anlass.php';
 
-final class PersonTest extends TestCase
+final class PersonTest extends ModelTestCase
 {
-    protected function setUp(): void
-    {
-        Datenbank::fuerTests();
-    }
-
     private function findePersonNachName(string $name): array
     {
-        foreach (Person::alle() as $person) {
-            if ($person['name'] === $name) {
-                return $person;
-            }
-        }
-
-        $this->fail("Person mit Namen '$name' wurde nicht gefunden.");
+        return $this->findeInListe(Person::alle(), 'name', $name);
     }
 
     private function gibtEsPersonMitName(string $name): bool
     {
-        foreach (Person::alle() as $person) {
-            if ($person['name'] === $name) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->gibtEsInListe(Person::alle(), 'name', $name);
     }
 
     public function testErstellenUndAlle(): void
@@ -190,5 +172,21 @@ final class PersonTest extends TestCase
         $this->assertTrue(Person::istGueltigeDetails('Interessiert sich für die Europäische Union'));
         $this->assertTrue(Person::istGueltigeDetails('Nutzt Dropbox zum Teilen von Fotos'));
         $this->assertTrue(Person::istGueltigeDetails('Mag eine große Selection an Farben'));
+    }
+
+    public function testValidiereEingabeLiefertLeereListeBeiGueltigenWerten(): void
+    {
+        $fehler = Person::validiereEingabe('Anna-Lena', '1994-05-03', 'weiblich', 'Mag Bücher.');
+
+        $this->assertSame([], $fehler);
+    }
+
+    public function testValidiereEingabeSammeltMehrereFehler(): void
+    {
+        $fehler = Person::validiereEingabe('', '', 'unbekannt', str_repeat('a', 1001));
+
+        $this->assertCount(4, $fehler);
+        $this->assertSame('Bitte einen Namen angeben.', $fehler[0]);
+        $this->assertSame('Bitte ein Geburtsdatum angeben.', $fehler[1]);
     }
 }

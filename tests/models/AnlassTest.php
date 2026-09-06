@@ -1,37 +1,19 @@
 <?php
 
-use PHPUnit\Framework\TestCase;
-
+require_once __DIR__ . '/../ModelTestCase.php';
 require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Person.php';
 
-final class AnlassTest extends TestCase
+final class AnlassTest extends ModelTestCase
 {
-    protected function setUp(): void
-    {
-        Datenbank::fuerTests();
-    }
-
     private function findeAnlassNachName(string $name): array
     {
-        foreach (Anlass::alle() as $anlass) {
-            if ($anlass['name'] === $name) {
-                return $anlass;
-            }
-        }
-
-        $this->fail("Anlass mit Namen '$name' wurde nicht gefunden.");
+        return $this->findeInListe(Anlass::alle(), 'name', $name);
     }
 
     private function gibtEsAnlassMitName(string $name): bool
     {
-        foreach (Anlass::alle() as $anlass) {
-            if ($anlass['name'] === $name) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->gibtEsInListe(Anlass::alle(), 'name', $name);
     }
 
     public function testErstellenUndAlle(): void
@@ -239,5 +221,43 @@ final class AnlassTest extends TestCase
             array_search('Wiederkehrend spaeter', $namen, true),
             array_search('Bald', $namen, true)
         );
+    }
+
+    public function testValidiereNameUndDatumLiefertLeereListeBeiGueltigenWerten(): void
+    {
+        $this->assertSame([], Anlass::validiereNameUndDatum('Hochzeit', '2026-06-01'));
+    }
+
+    public function testValidiereNameUndDatumLehntLeerenNamenUndUngueltigesDatumAb(): void
+    {
+        $fehler = Anlass::validiereNameUndDatum('', 'kein-datum');
+
+        $this->assertCount(2, $fehler);
+        $this->assertSame('Bitte einen Namen für den Anlass angeben.', $fehler[0]);
+        $this->assertSame('Bitte ein gültiges Datum angeben.', $fehler[1]);
+    }
+
+    public function testAlleInklGeburtstageEnthaeltEchteAnlaesseUndGeburtstage(): void
+    {
+        Person::erstellen('Max', '1990-06-15', null, null);
+        Anlass::erstellen('Hochzeit', '2026-06-01', false, []);
+
+        $namen = array_column(Anlass::alleInklGeburtstage(), 'name');
+
+        $this->assertContains('Weihnachten', $namen);
+        $this->assertContains('Hochzeit', $namen);
+        $this->assertContains('Geburtstag Max', $namen);
+    }
+
+    public function testAlleInklGeburtstageKennzeichnetGeburtstageKorrekt(): void
+    {
+        Person::erstellen('Max', '1990-06-15', null, null);
+
+        $alle = Anlass::alleInklGeburtstage();
+        $geburtstag = $this->findeInListe($alle, 'name', 'Geburtstag Max');
+        $weihnachten = $this->findeInListe($alle, 'name', 'Weihnachten');
+
+        $this->assertTrue($geburtstag['ist_geburtstag']);
+        $this->assertFalse($weihnachten['ist_geburtstag']);
     }
 }

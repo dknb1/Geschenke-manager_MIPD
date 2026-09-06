@@ -2,7 +2,6 @@
 
 require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Einstellung.php';
-require_once __DIR__ . '/../../backend/models/Person.php';
 
 // Neue Einstellung speichern
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
@@ -28,19 +27,11 @@ $navBenachrichtigungTage = Einstellung::benachrichtigungTage();
 // der einbindenden Seite ueberschreiben (siehe z. B. anlaesse.php, das selbst $anlaesse/
 // $anlass fuer seine eigene Liste verwendet).
 // Geburtstage sind fachlich Anlaesse, stehen aber bewusst nicht als eigene Zeile in
-// anlaesse (siehe Person::geburtstagAlsAnlass()) - deshalb hier genau wie in anlaesse.php
-// zusaetzlich reinberechnet. Ohne das wuerden Geburtstage nie als Benachrichtigung
-// auftauchen, obwohl das laut Aufgabenstellung ausdruecklich gefordert ist
+// anlaesse (siehe Person::geburtstagAlsAnlass()) - Anlass::alleInklGeburtstage() blendet sie
+// genau wie in anlaesse.php zusaetzlich ein. Ohne das wuerden Geburtstage nie als
+// Benachrichtigung auftauchen, obwohl das fachlich ausdruecklich gefordert ist
 // ("Benachrichtigung ueber Geburtstage im naechsten Monat").
-$navAnlaesse = array_map(
-    static fn (array $a): array => $a + ['ist_geburtstag' => false],
-    Anlass::alle()
-);
-$navGeburtstage = array_map(
-    static fn (array $p): array => Person::geburtstagAlsAnlass($p),
-    Person::alle()
-);
-$navAnlaesse = array_merge($navAnlaesse, $navGeburtstage);
+$navAnlaesse = Anlass::alleInklGeburtstage();
 $navBenachrichtigungen = [];
 
 $navHeute = new DateTimeImmutable('today');

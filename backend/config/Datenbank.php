@@ -76,6 +76,41 @@ class Datenbank
     }
 
     /**
+     * Ersetzt die komplette Verknuepfung eines Datensatzes in einer N:M-Zwischentabelle
+     * (loeschen + neu anlegen statt Diff - die Mengen im Prototyp-Umfang sind klein). Gemeinsame
+     * Grundlage fuer Anlass::personenVerknuepfen() (anlass_personen) und
+     * Geschenkidee::anlaesseVerknuepfen() (geschenkidee_anlaesse), die vorher denselben
+     * DELETE+INSERT-Code jeweils eigenstaendig implementiert hatten.
+     *
+     * $tabelle/$eigeneSpalte/$fremdeSpalte werden direkt in die SQL-Strings eingesetzt (keine
+     * Prepared-Statement-Platzhalter fuer Tabellen-/Spaltennamen moeglich) - das ist hier
+     * unbedenklich, weil diese Werte ausschliesslich von den beiden Aufrufstellen im eigenen
+     * Code kommen, niemals aus Nutzereingaben (gleiches Vertrauensmodell wie bei
+     * migriereFehlendeSpalten() oben). $fremdeIds sind normale Werte und werden parametrisiert
+     * gebunden.
+     *
+     * @param int[] $fremdeIds
+     */
+    public static function ersetzeVerknuepfung(
+        PDO $pdo,
+        string $tabelle,
+        string $eigeneSpalte,
+        int $eigeneId,
+        string $fremdeSpalte,
+        array $fremdeIds
+    ): void {
+        $pdo->prepare("DELETE FROM $tabelle WHERE $eigeneSpalte = :eigene_id")
+            ->execute(['eigene_id' => $eigeneId]);
+
+        $stmt = $pdo->prepare(
+            "INSERT INTO $tabelle ($eigeneSpalte, $fremdeSpalte) VALUES (:eigene_id, :fremde_id)"
+        );
+        foreach (array_unique($fremdeIds) as $fremdeId) {
+            $stmt->execute(['eigene_id' => $eigeneId, 'fremde_id' => $fremdeId]);
+        }
+    }
+
+    /**
      * Weihnachten ist ein fester Pflichtanlass (nicht personenbezogen,
      * anders als Geburtstage). Wird nur einmal angelegt, falls noch nicht vorhanden.
      */

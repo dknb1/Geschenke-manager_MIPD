@@ -1,27 +1,11 @@
 <?php
 
 require_once __DIR__ . '/../config/Datenbank.php';
+require_once __DIR__ . '/SqlDenylist.php';
 
 class Person
 {
     private const ERLAUBTE_GESCHLECHTER = ['maennlich', 'weiblich', 'divers'];
-
-    /**
-     * Statement-Schluesselwoerter fuer die Freitext-Details. Name und Geschlecht werden
-     * bereits per Allowlist/Enum geprueft, brauchen also keine zusaetzliche Denylist.
-     * Dient als zweite Verteidigungslinie zusaetzlich zu den parametrisierten Queries
-     * unten (Anforderung: "Eingabefelder duerfen keine SQL-Schluesselwoerter akzeptieren").
-     * ALTER und UNION bewusst nicht enthalten - beides sind zu gebraeuchliche
-     * Alltagswoerter ("Alter" = Lebensalter, "Union" z. B. in Buch-/Filmtiteln),
-     * die hier staendig faelschlich abgelehnt wuerden. Die eigentliche
-     * Injection-Verhinderung leisten ohnehin die parametrisierten Queries.
-     */
-    private const SQL_SCHLUESSELWOERTER = [
-        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'EXEC',
-        'TRUNCATE', 'CREATE TABLE',
-    ];
-
-    private const SQL_SONDERZEICHEN = ['--', ';', '/*', '*/'];
 
     public static function alle(): array
     {
@@ -99,7 +83,6 @@ class Person
             'datum' => $person['geburtsdatum'],
             'wiederholt_jaehrlich' => 1,
             'geschuetzt' => 1,
-            'person_name' => null,
             'ist_geburtstag' => true,
             'person_id' => (int) $person['id'],
         ];
@@ -151,28 +134,39 @@ class Person
 
     public static function istGueltigeDetails(string $details): bool
     {
-        return strlen($details) <= 1000 && !self::enthaeltSqlSchluesselwort($details);
+        return strlen($details) <= 1000 && !SqlDenylist::enthaeltSchluesselwort($details);
     }
 
     /**
-     * Sucht die Schluesselwoerter als eigenstaendige Woerter (\b-Wortgrenzen), nicht als
-     * blosse Teilzeichenkette - sonst wuerden z. B. "Dropbox" oder "Selection" faelschlich
-     * abgelehnt, obwohl sie SELECT/DROP nur als Teil eines laengeren Wortes enthalten.
+     * Buendelt die Validierung von Name/Geburtsdatum/Geschlecht/Details fuer erstellen()/
+     * aktualisieren() in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) -
+     * zentrale Stelle statt dieselbe Pruefungs-/Fehlertext-Kette in person-anlegen.php und
+     * person-bearbeiten.php dupliziert zu pflegen.
      */
-    public static function enthaeltSqlSchluesselwort(string $eingabe): bool
+    public static function validiereEingabe(string $name, string $geburtsdatum, string $geschlecht, string $details): array
     {
-        foreach (self::SQL_SCHLUESSELWOERTER as $schluesselwort) {
-            if (preg_match('/\b' . preg_quote($schluesselwort, '/') . '\b/i', $eingabe) === 1) {
-                return true;
-            }
+        $fehler = [];
+
+        if ($name === '') {
+            $fehler[] = 'Bitte einen Namen angeben.';
+        } elseif (!self::istGueltigerName($name)) {
+            $fehler[] = 'Der Name darf nur Buchstaben, Leerzeichen, Bindestriche und Apostrophe enthalten.';
         }
 
-        foreach (self::SQL_SONDERZEICHEN as $zeichen) {
-            if (str_contains($eingabe, $zeichen)) {
-                return true;
-            }
+        if ($geburtsdatum === '') {
+            $fehler[] = 'Bitte ein Geburtsdatum angeben.';
+        } elseif (!self::istGueltigesGeburtsdatum($geburtsdatum)) {
+            $fehler[] = 'Bitte ein gültiges Geburtsdatum angeben (nicht in der Zukunft).';
         }
 
-        return false;
+        if (!self::istGueltigesGeschlecht($geschlecht)) {
+            $fehler[] = 'Bitte ein gültiges Geschlecht auswählen.';
+        }
+
+        if (!self::istGueltigeDetails($details)) {
+            $fehler[] = 'Die Details enthalten nicht erlaubte Inhalte oder sind zu lang (max. 1000 Zeichen).';
+        }
+
+        return $fehler;
     }
 }

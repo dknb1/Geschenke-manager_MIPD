@@ -83,26 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
 
         $person = $personId !== '' ? Person::finden((int) $personId) : null;
-
-        if ($person === null) {
-            $fehler[] = 'Bitte eine Person auswählen.';
-        }
-
-        if (!Geschenkidee::hatInhalt($text, $link, $bildLink)) {
-            $fehler[] = 'Bitte mindestens einen Inhalt angeben: Text, Link oder Bild.';
-        }
-
-        if (!Geschenkidee::istGueltigerText($text)) {
-            $fehler[] = 'Die Idee enthält nicht erlaubte Inhalte oder ist zu lang (max. 1000 Zeichen).';
-        }
-
-        if (!Geschenkidee::istGueltigeUrl($link)) {
-            $fehler[] = 'Bitte einen gültigen Link angeben (z. B. https://...).';
-        }
-
-        if (!Geschenkidee::istGueltigeUrl($bildLink)) {
-            $fehler[] = 'Bitte einen gültigen Bild-Link angeben (z. B. https://...).';
-        }
+        $fehler = Geschenkidee::validiereEingabe($person, $text, $link, $bildLink);
 
         if (empty($fehler)) {
             Geschenkidee::aktualisieren(

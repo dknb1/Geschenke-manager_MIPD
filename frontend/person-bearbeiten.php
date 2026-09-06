@@ -43,25 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $geschlecht = $_POST['geschlecht'] ?? '';
     $details = trim($_POST['details'] ?? '');
 
-    if ($name === '') {
-        $fehler[] = 'Bitte einen Namen angeben.';
-    } elseif (!Person::istGueltigerName($name)) {
-        $fehler[] = 'Der Name darf nur Buchstaben, Leerzeichen, Bindestriche und Apostrophe enthalten.';
-    }
-
-    if ($geburtsdatum === '') {
-        $fehler[] = 'Bitte ein Geburtsdatum angeben.';
-    } elseif (!Person::istGueltigesGeburtsdatum($geburtsdatum)) {
-        $fehler[] = 'Bitte ein gültiges Geburtsdatum angeben (nicht in der Zukunft).';
-    }
-
-    if (!Person::istGueltigesGeschlecht($geschlecht)) {
-        $fehler[] = 'Bitte ein gültiges Geschlecht auswählen.';
-    }
-
-    if (!Person::istGueltigeDetails($details)) {
-        $fehler[] = 'Die Details enthalten nicht erlaubte Inhalte oder sind zu lang (max. 1000 Zeichen).';
-    }
+    $fehler = Person::validiereEingabe($name, $geburtsdatum, $geschlecht, $details);
 
     if (empty($fehler)) {
         Person::aktualisieren(

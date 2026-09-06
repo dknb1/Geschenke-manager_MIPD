@@ -18,12 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gueltigePersonIds
     ));
 
-    if ($name === '') {
-        $fehler[] = 'Bitte einen Namen für den Anlass angeben.';
-    }
-    if ($datum === '' || !DateTime::createFromFormat('Y-m-d', $datum)) {
-        $fehler[] = 'Bitte ein gültiges Datum angeben.';
-    }
+    $fehler = Anlass::validiereNameUndDatum($name, $datum);
+
     if (!in_array($wiederholung, ['ja', 'nein'], true)) {
         $fehler[] = 'Bitte angeben, ob sich der Anlass wiederholt.';
     }

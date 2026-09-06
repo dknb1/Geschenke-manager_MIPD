@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../config/Datenbank.php';
+require_once __DIR__ . '/Person.php';
 
 class Anlass
 {
@@ -20,6 +21,54 @@ class Anlass
         );
 
         return $anlaesse;
+    }
+
+    /**
+     * Alle echten Anlaesse (siehe alle()) zusammen mit den live berechneten Geburtstagen aller
+     * Personen (siehe Person::geburtstagAlsAnlass()), gemeinsam nach naechstem Vorkommen
+     * sortiert. Zentrale Stelle fuer dieses Zusammenfuehren, das vorher in anlaesse.php und
+     * frontend/includes/navbar.php separat dupliziert war.
+     */
+    public static function alleInklGeburtstage(): array
+    {
+        $anlaesse = array_map(
+            static fn (array $a): array => $a + ['ist_geburtstag' => false, 'person_id' => null],
+            self::alle()
+        );
+        $geburtstage = array_map(
+            static fn (array $p): array => Person::geburtstagAlsAnlass($p),
+            Person::alle()
+        );
+        $alle = array_merge($anlaesse, $geburtstage);
+
+        usort(
+            $alle,
+            fn (array $a, array $b) => self::naechstesVorkommen($a) <=> self::naechstesVorkommen($b)
+        );
+
+        return $alle;
+    }
+
+    /**
+     * Buendelt die Validierung von Name und Datum eines Anlasses fuer erstellen()/
+     * aktualisieren() in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) -
+     * zentrale Stelle statt dieselbe Pruefung in anlass-erstellen.php und
+     * anlass-bearbeiten.php dupliziert zu pflegen. Die Wiederholung wird bewusst NICHT hier
+     * mitgeprueft, da anlass-bearbeiten.php sie bei geschuetzten Anlaessen anders behandelt
+     * (siehe dort) - das ist der einzige Teil, der zwischen beiden Seiten wirklich abweicht.
+     */
+    public static function validiereNameUndDatum(string $name, string $datum): array
+    {
+        $fehler = [];
+
+        if ($name === '') {
+            $fehler[] = 'Bitte einen Namen für den Anlass angeben.';
+        }
+        if ($datum === '' || !DateTime::createFromFormat('Y-m-d', $datum)) {
+            $fehler[] = 'Bitte ein gültiges Datum angeben.';
+        }
+
+        return $fehler;
     }
 
     /**
@@ -117,15 +166,7 @@ class Anlass
      */
     private static function personenVerknuepfen(PDO $pdo, int $anlassId, array $personIds): void
     {
-        $pdo->prepare('DELETE FROM anlass_personen WHERE anlass_id = :anlass_id')
-            ->execute(['anlass_id' => $anlassId]);
-
-        $stmt = $pdo->prepare(
-            'INSERT INTO anlass_personen (anlass_id, person_id) VALUES (:anlass_id, :person_id)'
-        );
-        foreach (array_unique($personIds) as $personId) {
-            $stmt->execute(['anlass_id' => $anlassId, 'person_id' => $personId]);
-        }
+        Datenbank::ersetzeVerknuepfung($pdo, 'anlass_personen', 'anlass_id', $anlassId, 'person_id', $personIds);
     }
 
     /**

@@ -1,24 +1,10 @@
 <?php
 require_once __DIR__ . '/../backend/models/Anlass.php';
-require_once __DIR__ . '/../backend/models/Person.php';
 
-// Geburtstage sind fachlich Anlaesse, werden aber nicht als eigene
-// Zeile in der anlaesse-Tabelle dupliziert (siehe Person::geburtstagAlsAnlass()) - deshalb
-// hier live aus Person::alle() eingeblendet und ueber dieselbe naechstesVorkommen()-Logik
-// wie Weihnachten einsortiert.
-$anlaesse = array_map(
-    static fn (array $a): array => $a + ['ist_geburtstag' => false, 'person_id' => null],
-    Anlass::alle()
-);
-$geburtstage = array_map(
-    static fn (array $p): array => Person::geburtstagAlsAnlass($p),
-    Person::alle()
-);
-$anlaesse = array_merge($anlaesse, $geburtstage);
-usort(
-    $anlaesse,
-    fn (array $a, array $b) => Anlass::naechstesVorkommen($a) <=> Anlass::naechstesVorkommen($b)
-);
+// Geburtstage sind fachlich Anlaesse, werden aber nicht als eigene Zeile in der
+// anlaesse-Tabelle dupliziert (siehe Person::geburtstagAlsAnlass()) - deshalb hier zusammen
+// mit den echten Anlaessen ueber Anlass::alleInklGeburtstage() eingeblendet.
+$anlaesse = Anlass::alleInklGeburtstage();
 ?>
 <!DOCTYPE html>
 <html lang="de">
