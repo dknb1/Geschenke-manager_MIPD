@@ -131,20 +131,21 @@ $ideen = Geschenkidee::alle();
             <?php foreach ($ideen as $idee): ?>
                 <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
-                    <strong><?= htmlspecialchars($idee['person_name']) ?>:</strong>
-                    <?php if (!empty($idee['text'])): ?>
-                        <?= htmlspecialchars($idee['text']) ?>
-                    <?php endif; ?>
+                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
+                        <strong><?= htmlspecialchars($idee['person_name']) ?>:</strong>
+                        <?php if (!empty($idee['text'])): ?>
+                            <?= htmlspecialchars($idee['text']) ?>
+                        <?php endif; ?>
+                        <?php if (!empty($anlassNamen)): ?>
+                            (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
+                        <?php endif; ?>
+                    </a>
                     <?php if (!empty($idee['link'])): ?>
                         <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
                     <?php endif; ?>
                     <?php if (!empty($idee['bild_link'])): ?>
                         <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
                     <?php endif; ?>
-                    <?php if (!empty($anlassNamen)): ?>
-                        (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
-                    <?php endif; ?>
-                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">Bearbeiten</a>
                 </li>
             <?php endforeach; ?>
         </ul>
