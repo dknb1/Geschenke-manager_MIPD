@@ -25,6 +25,15 @@ $bildLink = $idee['bild_link'] ?? '';
 $anlassIds = array_map('intval', array_column(Geschenkidee::anlaesse($id), 'id'));
 $fuerGeburtstag = (int) $idee['fuer_geburtstag'] === 1;
 
+// Anlaesse, die man fest zuordnen darf - keine Anlaesse, deren naechstes Vorkommen bereits
+// vergangen ist (siehe Geschenkidee::istGueltigerZielAnlass()). Bei wiederkehrenden Anlaessen
+// ist das ohnehin immer erfuellt.
+$heute = new DateTimeImmutable('today');
+$gueltigeFestAnlaesse = array_values(array_filter(
+    Anlass::alle(),
+    fn (array $a) => Geschenkidee::istGueltigerZielAnlass($a, $heute)
+));
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aktion = $_POST['aktion'] ?? 'speichern';
 
@@ -34,57 +43,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $personId = trim($_POST['person'] ?? '');
-    $text = trim($_POST['text'] ?? '');
-    $link = trim($_POST['link'] ?? '');
-    $bildLink = trim($_POST['bild_link'] ?? '');
-    $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
-    $gueltigeAnlassIds = array_column(Anlass::alle(), 'id');
-    $anlassIds = array_values(array_intersect(
-        array_map('intval', $_POST['anlass_ids'] ?? []),
-        $gueltigeAnlassIds
-    ));
+    if ($aktion === 'fest_machen') {
+        $zielAnlassId = filter_input(INPUT_POST, 'geschenk_anlass_id', FILTER_VALIDATE_INT);
+        $gueltigeFestAnlassIds = array_column($gueltigeFestAnlaesse, 'id');
 
-    $person = $personId !== '' ? Person::finden((int) $personId) : null;
+        if ($zielAnlassId && in_array($zielAnlassId, $gueltigeFestAnlassIds, true)) {
+            Geschenkidee::festMachen($id, $zielAnlassId);
+            header('Location: idee-bearbeiten.php?id=' . $id);
+            exit;
+        }
 
-    if ($person === null) {
-        $fehler[] = 'Bitte eine Person auswählen.';
+        $fehler[] = 'Bitte einen gültigen Anlass auswählen (kein Anlass in der Vergangenheit).';
     }
 
-    if (!Geschenkidee::hatInhalt($text, $link, $bildLink)) {
-        $fehler[] = 'Bitte mindestens einen Inhalt angeben: Text, Link oder Bild.';
-    }
-
-    if (!Geschenkidee::istGueltigerText($text)) {
-        $fehler[] = 'Die Idee enthält nicht erlaubte Inhalte oder ist zu lang (max. 1000 Zeichen).';
-    }
-
-    if (!Geschenkidee::istGueltigeUrl($link)) {
-        $fehler[] = 'Bitte einen gültigen Link angeben (z. B. https://...).';
-    }
-
-    if (!Geschenkidee::istGueltigeUrl($bildLink)) {
-        $fehler[] = 'Bitte einen gültigen Bild-Link angeben (z. B. https://...).';
-    }
-
-    if (empty($fehler)) {
-        Geschenkidee::aktualisieren(
-            $id,
-            (int) $personId,
-            $text !== '' ? $text : null,
-            $link !== '' ? $link : null,
-            $bildLink !== '' ? $bildLink : null,
-            $anlassIds,
-            $fuerGeburtstag
-        );
-        header('Location: idee-speichern.php');
+    if ($aktion === 'offen_setzen') {
+        Geschenkidee::zurueckAufOffen($id);
+        header('Location: idee-bearbeiten.php?id=' . $id);
         exit;
+    }
+
+    if ($aktion === 'speichern') {
+        $personId = trim($_POST['person'] ?? '');
+        $text = trim($_POST['text'] ?? '');
+        $link = trim($_POST['link'] ?? '');
+        $bildLink = trim($_POST['bild_link'] ?? '');
+        $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
+        $gueltigeAnlassIds = array_column(Anlass::alle(), 'id');
+        $anlassIds = array_values(array_intersect(
+            array_map('intval', $_POST['anlass_ids'] ?? []),
+            $gueltigeAnlassIds
+        ));
+
+        $person = $personId !== '' ? Person::finden((int) $personId) : null;
+
+        if ($person === null) {
+            $fehler[] = 'Bitte eine Person auswählen.';
+        }
+
+        if (!Geschenkidee::hatInhalt($text, $link, $bildLink)) {
+            $fehler[] = 'Bitte mindestens einen Inhalt angeben: Text, Link oder Bild.';
+        }
+
+        if (!Geschenkidee::istGueltigerText($text)) {
+            $fehler[] = 'Die Idee enthält nicht erlaubte Inhalte oder ist zu lang (max. 1000 Zeichen).';
+        }
+
+        if (!Geschenkidee::istGueltigeUrl($link)) {
+            $fehler[] = 'Bitte einen gültigen Link angeben (z. B. https://...).';
+        }
+
+        if (!Geschenkidee::istGueltigeUrl($bildLink)) {
+            $fehler[] = 'Bitte einen gültigen Bild-Link angeben (z. B. https://...).';
+        }
+
+        if (empty($fehler)) {
+            Geschenkidee::aktualisieren(
+                $id,
+                (int) $personId,
+                $text !== '' ? $text : null,
+                $link !== '' ? $link : null,
+                $bildLink !== '' ? $bildLink : null,
+                $anlassIds,
+                $fuerGeburtstag
+            );
+            header('Location: idee-speichern.php');
+            exit;
+        }
     }
 }
 
 $personen = Person::alle();
 $anlaesse = Anlass::alle();
 $aktuellePerson = Person::finden((int) $personId);
+$festerAnlass = $idee['geschenk_anlass_id'] !== null ? Anlass::finden((int) $idee['geschenk_anlass_id']) : null;
+$festIstVergangen = $festerAnlass !== null
+    && new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -142,7 +175,29 @@ $aktuellePerson = Person::finden((int) $personId);
             Diese Idee ist auch für den Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?> gedacht
         </label>
 
+        <?php if ($festerAnlass !== null): ?>
+            <p>
+                Fest zugeordnet zu: <strong><?= htmlspecialchars($festerAnlass['name']) ?></strong>
+                am <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>
+                <?php if ($festIstVergangen): ?><strong>(vergangen)</strong><?php endif; ?>
+            </p>
+        <?php else: ?>
+            <label for="geschenk_anlass_id">Fest zuordnen zu (macht diese Idee zum Geschenk für genau diesen Anlass):</label>
+            <select id="geschenk_anlass_id" name="geschenk_anlass_id">
+                <option value="">Anlass auswählen</option>
+                <?php foreach ($gueltigeFestAnlaesse as $anlass): ?>
+                    <option value="<?= (int) $anlass['id'] ?>"><?= htmlspecialchars($anlass['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        <?php endif; ?>
+
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
+
+        <?php if ($festerAnlass !== null): ?>
+            <button type="submit" name="aktion" value="offen_setzen">Fest-Zuordnung aufheben</button>
+        <?php else: ?>
+            <button type="submit" name="aktion" value="fest_machen">Fest machen</button>
+        <?php endif; ?>
 
         <button type="submit" name="aktion" value="loeschen">Idee löschen</button>
 

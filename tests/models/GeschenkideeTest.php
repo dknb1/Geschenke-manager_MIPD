@@ -256,4 +256,110 @@ final class GeschenkideeTest extends TestCase
 
         $this->assertContains('Geburtstag Tim', Geschenkidee::anlassNamenInklGeburtstag($id));
     }
+
+    public function testFestMachenSetztAnlassUndDatumUndUeberschreibtDieAnzeige(): void
+    {
+        $inZweiMonaten = (new DateTimeImmutable('today'))->modify('+2 months')->format('Y-m-d');
+        $inDreiMonaten = (new DateTimeImmutable('today'))->modify('+3 months')->format('Y-m-d');
+
+        $personId = $this->testPersonAnlegen('Max');
+        Anlass::erstellen('Hochzeit', $inZweiMonaten, false, []);
+        Anlass::erstellen('Jubiläum', $inDreiMonaten, false, []);
+        $hochzeitId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+        $jubilaeumId = (int) $this->findeAnlassNachName('Jubiläum')['id'];
+
+        // Idee lose fuer beide Anlaesse getaggt UND fuer den Geburtstag markiert.
+        Geschenkidee::erstellen($personId, 'Mehrfach-Kandidat', null, null, [$hochzeitId, $jubilaeumId], true);
+        $id = (int) $this->findeIdeeNachText('Mehrfach-Kandidat')['id'];
+
+        Geschenkidee::festMachen($id, $hochzeitId);
+
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertSame($hochzeitId, (int) $aktualisiert['geschenk_anlass_id']);
+        $this->assertSame($inZweiMonaten, $aktualisiert['geschenk_datum']);
+
+        // Sobald fest, zeigt die Anzeige NUR noch den festen Anlass - Jubilaeum und Geburtstag
+        // verschwinden aus der Anzeige, obwohl die losen Tags in der DB unveraendert bleiben.
+        $this->assertSame(['Hochzeit'], Geschenkidee::anlassNamenInklGeburtstag($id));
+    }
+
+    public function testZurueckAufOffenBringtLoseTagsZurueck(): void
+    {
+        $inZweiMonaten = (new DateTimeImmutable('today'))->modify('+2 months')->format('Y-m-d');
+
+        $personId = $this->testPersonAnlegen('Anna');
+        Anlass::erstellen('Hochzeit', $inZweiMonaten, false, []);
+        $hochzeitId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null, [$hochzeitId], true);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        Geschenkidee::festMachen($id, $hochzeitId);
+        $this->assertSame(['Hochzeit'], Geschenkidee::anlassNamenInklGeburtstag($id));
+
+        Geschenkidee::zurueckAufOffen($id);
+
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertNull($aktualisiert['geschenk_anlass_id']);
+        $this->assertNull($aktualisiert['geschenk_datum']);
+        // Die urspruenglichen losen Tags (Hochzeit + Geburtstag) sind nie geloescht worden und
+        // tauchen jetzt automatisch wieder auf.
+        $namen = Geschenkidee::anlassNamenInklGeburtstag($id);
+        $this->assertContains('Hochzeit', $namen);
+        $this->assertContains('Geburtstag Anna', $namen);
+    }
+
+    public function testAnlassNamenInklGeburtstagZeigtVergangenBeiFestemVergangenemDatum(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+        Anlass::erstellen('Vergangene Feier', '2020-01-01', false, []);
+        $anlassId = (int) $this->findeAnlassNachName('Vergangene Feier')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        // festMachen() wuerde ueber die Validierung in istGueltigerZielAnlass() normalerweise
+        // nicht fuer einen vergangenen Anlass aufgerufen - hier direkt das Datum simuliert, um
+        // die Anzeige-Logik fuer bereits vergangene feste Geschenke isoliert zu testen.
+        Geschenkidee::festMachen($id, $anlassId);
+
+        $this->assertSame(['Vergangene Feier - vergangen'], Geschenkidee::anlassNamenInklGeburtstag($id));
+    }
+
+    public function testIstGueltigerZielAnlassLehntVergangeneEinmaligeAnlaesseAb(): void
+    {
+        $heute = new DateTimeImmutable('2026-06-01');
+        $vergangenerAnlass = ['datum' => '2026-01-01', 'wiederholt_jaehrlich' => 0];
+
+        $this->assertFalse(Geschenkidee::istGueltigerZielAnlass($vergangenerAnlass, $heute));
+    }
+
+    public function testIstGueltigerZielAnlassAkzeptiertWiederkehrendeUndZukuenftigeAnlaesse(): void
+    {
+        $heute = new DateTimeImmutable('2026-06-01');
+        $wiederkehrenderAnlass = ['datum' => '2020-01-01', 'wiederholt_jaehrlich' => 1];
+        $zukuenftigerAnlass = ['datum' => '2026-12-24', 'wiederholt_jaehrlich' => 0];
+
+        $this->assertTrue(Geschenkidee::istGueltigerZielAnlass($wiederkehrenderAnlass, $heute));
+        $this->assertTrue(Geschenkidee::istGueltigerZielAnlass($zukuenftigerAnlass, $heute));
+    }
+
+    public function testAnlassNamenInklGeburtstagBlendetVergangeneLoseEinmaligeAnlaesseAus(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+        Anlass::erstellen('Vergangener Anlass', '2020-01-01', false, []);
+        Anlass::erstellen('Zukünftiger Anlass', '2099-01-01', false, []);
+        $vergangenerId = (int) $this->findeAnlassNachName('Vergangener Anlass')['id'];
+        $zukuenftigerId = (int) $this->findeAnlassNachName('Zukünftiger Anlass')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null, [$vergangenerId, $zukuenftigerId]);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        // Nicht geloescht, nur ausgeblendet: die Verknuepfung existiert weiterhin in der DB.
+        $alleVerknuepften = array_column(Geschenkidee::anlaesse($id), 'name');
+        $this->assertContains('Vergangener Anlass', $alleVerknuepften);
+
+        $angezeigt = Geschenkidee::anlassNamenInklGeburtstag($id);
+        $this->assertSame(['Zukünftiger Anlass'], $angezeigt);
+    }
 }

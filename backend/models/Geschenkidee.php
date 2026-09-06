@@ -104,6 +104,64 @@ class Geschenkidee
         self::anlaesseVerknuepfen($pdo, $id, $anlassIds);
     }
 
+    /**
+     * Wandelt die Idee in ein "festes" Geschenk fuer $anlassId um (Idee->Geschenk-Umwandlung,
+     * Aufgabenstellung: "inkl. Anlass und Datum"). Das Datum wird HIER eingefroren
+     * (Anlass::naechstesVorkommen() zum jetzigen Zeitpunkt), nicht live nachberechnet -
+     * sonst koennte ein wiederkehrender Anlass (dessen naechstesVorkommen() nie in der
+     * Vergangenheit liegt) niemals als "vergangen" erkannt werden. Vorausgesetzt wird, dass
+     * der Aufrufer bereits mit istGueltigerZielAnlass() geprueft hat, dass $anlassId existiert
+     * und nicht in der Vergangenheit liegt.
+     */
+    public static function festMachen(int $id, int $anlassId): void
+    {
+        $anlass = Anlass::finden($anlassId);
+        if ($anlass === null) {
+            return;
+        }
+
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'UPDATE geschenkideen
+             SET geschenk_anlass_id = :anlass_id, geschenk_datum = :geschenk_datum
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'anlass_id' => $anlassId,
+            'geschenk_datum' => Anlass::naechstesVorkommen($anlass)->format('Y-m-d'),
+            'id' => $id,
+        ]);
+    }
+
+    /**
+     * Macht eine feste Geschenk-Zuordnung rueckgaengig - die Idee gilt danach wieder als
+     * "offen". Die losen Anlass-Tags (anlaesse()/fuer_geburtstag) werden davon nicht
+     * beruehrt, da sie waehrend der Fest-Zuordnung nicht veraendert wurden (siehe
+     * anlassNamenInklGeburtstag() - sie tauchen in der Anzeige automatisch wieder auf).
+     */
+    public static function zurueckAufOffen(int $id): void
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'UPDATE geschenkideen
+             SET geschenk_anlass_id = NULL, geschenk_datum = NULL
+             WHERE id = :id'
+        );
+        $stmt->execute(['id' => $id]);
+    }
+
+    /**
+     * Ein Anlass darf nur dann fest zugeordnet werden, wenn sein naechstes Vorkommen noch
+     * nicht vergangen ist - man soll keine Geschenke rueckwirkend fuer die Vergangenheit
+     * "planen". Bei wiederkehrenden Anlaessen ist das durch naechstesVorkommen() ohnehin
+     * immer erfuellt, bei einmaligen, bereits vergangenen Anlaessen greift die Sperre.
+     */
+    public static function istGueltigerZielAnlass(array $anlass, ?DateTimeImmutable $heute = null): bool
+    {
+        $heute ??= new DateTimeImmutable('today');
+        return Anlass::naechstesVorkommen($anlass, $heute) >= $heute;
+    }
+
     public static function loeschen(int $id): bool
     {
         if (self::finden($id) === null) {
@@ -162,13 +220,22 @@ class Geschenkidee
     }
 
     /**
-     * Namen aller Anlaesse, die zu dieser Idee passen: die explizit verknuepften (siehe
-     * anlaesse()) plus - nur falls fuer_geburtstag gesetzt ist - der Geburtstag der Person.
-     * Eine Idee ist NICHT automatisch fuer den Geburtstag gedacht (kann z. B. ausschliesslich
-     * ein Hochzeitsgeschenk oder ganz ohne Anlass sein), deshalb haengt das hier vom
-     * explizit gesetzten Flag ab statt immer dabei zu sein.
-     * Rein zur Anzeige - der Geburtstag wird nicht in geschenkidee_anlaesse gespeichert, genau
-     * wie er auch nicht als eigene Zeile in anlaesse steht (siehe Person::geburtstagAlsAnlass()).
+     * Namen aller Anlaesse, die zu dieser Idee passen - fuer die Anzeige (Ideenlisten).
+     *
+     * Ist die Idee fest einem Anlass zugeordnet (geschenk_anlass_id gesetzt), wird NUR dieser
+     * eine Anlass gezeigt (mit "- vergangen"-Zusatz, falls geschenk_datum bereits vorbei ist) -
+     * die losen Tags (anlaesse()/fuer_geburtstag) werden dann bewusst ausgeblendet, nicht
+     * geloescht: macht man die Fest-Zuordnung rueckgaengig (zurueckAufOffen()), tauchen sie
+     * hier automatisch wieder auf.
+     *
+     * Ist die Idee noch offen, werden die losen Verknuepfungen gezeigt: alle explizit
+     * verknuepften Anlaesse (siehe anlaesse()), deren naechstes Vorkommen noch nicht vergangen
+     * ist (ein bereits vergangener EINMALIGER Anlass wird hier nur ausgeblendet, nicht aus
+     * geschenkidee_anlaesse geloescht - wiederkehrende sind durch naechstesVorkommen() ohnehin
+     * nie "vergangen"), plus - nur falls fuer_geburtstag gesetzt ist - der Geburtstag der
+     * Person. Eine Idee ist NICHT automatisch fuer den Geburtstag gedacht (kann z. B.
+     * ausschliesslich ein Hochzeitsgeschenk oder ganz ohne Anlass sein), deshalb haengt das
+     * hier vom explizit gesetzten Flag ab statt immer dabei zu sein.
      */
     public static function anlassNamenInklGeburtstag(int $geschenkideeId): array
     {
@@ -177,7 +244,24 @@ class Geschenkidee
             return [];
         }
 
-        $namen = array_column(self::anlaesse($geschenkideeId), 'name');
+        if ($idee['geschenk_anlass_id'] !== null) {
+            $festerAnlass = Anlass::finden((int) $idee['geschenk_anlass_id']);
+            if ($festerAnlass === null) {
+                return [];
+            }
+
+            $istVergangen = new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
+            return [$festerAnlass['name'] . ($istVergangen ? ' - vergangen' : '')];
+        }
+
+        $heute = new DateTimeImmutable('today');
+        $namen = array_column(
+            array_filter(
+                self::anlaesse($geschenkideeId),
+                fn (array $anlass) => Anlass::naechstesVorkommen($anlass, $heute) >= $heute
+            ),
+            'name'
+        );
 
         if ((int) $idee['fuer_geburtstag'] === 1) {
             $person = Person::finden((int) $idee['person_id']);
