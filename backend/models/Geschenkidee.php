@@ -111,7 +111,9 @@ class Geschenkidee
      * sonst koennte ein wiederkehrender Anlass (dessen naechstesVorkommen() nie in der
      * Vergangenheit liegt) niemals als "vergangen" erkannt werden. Vorausgesetzt wird, dass
      * der Aufrufer bereits mit istGueltigerZielAnlass() geprueft hat, dass $anlassId existiert
-     * und nicht in der Vergangenheit liegt.
+     * und nicht in der Vergangenheit liegt. Setzt geschenk_fuer_geburtstag zurueck, falls die
+     * Idee vorher fest fuer den Geburtstag war - eine Idee ist immer nur fuer GENAU ein Ziel
+     * fest zugeordnet.
      */
     public static function festMachen(int $id, int $anlassId): void
     {
@@ -123,12 +125,45 @@ class Geschenkidee
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
-             SET geschenk_anlass_id = :anlass_id, geschenk_datum = :geschenk_datum
+             SET geschenk_anlass_id = :anlass_id, geschenk_fuer_geburtstag = 0,
+                 geschenk_datum = :geschenk_datum
              WHERE id = :id'
         );
         $stmt->execute([
             'anlass_id' => $anlassId,
             'geschenk_datum' => Anlass::naechstesVorkommen($anlass)->format('Y-m-d'),
+            'id' => $id,
+        ]);
+    }
+
+    /**
+     * Wandelt die Idee in ein "festes" Geschenk fuer den Geburtstag der zugehoerigen Person
+     * um - Gegenstueck zu festMachen() fuer den Fall, dass der Geburtstag selbst (nicht ein
+     * Eintrag aus anlaesse) das Ziel ist. Braucht eine eigene Methode statt eines Aufrufs von
+     * festMachen() mit einer Geburtstag-"ID", weil der Geburtstag keine echte anlaesse-Zeile
+     * und damit keine gueltige anlass_id hat (siehe Schema-Kommentar).
+     */
+    public static function festMachenFuerGeburtstag(int $id): void
+    {
+        $idee = self::finden($id);
+        if ($idee === null) {
+            return;
+        }
+
+        $person = Person::finden((int) $idee['person_id']);
+        if ($person === null) {
+            return;
+        }
+
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'UPDATE geschenkideen
+             SET geschenk_anlass_id = NULL, geschenk_fuer_geburtstag = 1,
+                 geschenk_datum = :geschenk_datum
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'geschenk_datum' => Anlass::naechstesVorkommen(Person::geburtstagAlsAnlass($person))->format('Y-m-d'),
             'id' => $id,
         ]);
     }
@@ -144,10 +179,20 @@ class Geschenkidee
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
-             SET geschenk_anlass_id = NULL, geschenk_datum = NULL
+             SET geschenk_anlass_id = NULL, geschenk_fuer_geburtstag = 0, geschenk_datum = NULL
              WHERE id = :id'
         );
         $stmt->execute(['id' => $id]);
+    }
+
+    /**
+     * Ist diese Idee ueberhaupt fest zugeordnet (zu einem Anlass ODER zum Geburtstag)?
+     * Zentrale Stelle fuer diese Pruefung, damit Aufrufer (Frontend, anlassNamenInklGeburtstag())
+     * nicht jeweils beide Felder einzeln abfragen muessen.
+     */
+    public static function istFest(array $idee): bool
+    {
+        return $idee['geschenk_anlass_id'] !== null || (int) $idee['geschenk_fuer_geburtstag'] === 1;
     }
 
     /**
@@ -222,11 +267,11 @@ class Geschenkidee
     /**
      * Namen aller Anlaesse, die zu dieser Idee passen - fuer die Anzeige (Ideenlisten).
      *
-     * Ist die Idee fest einem Anlass zugeordnet (geschenk_anlass_id gesetzt), wird NUR dieser
-     * eine Anlass gezeigt (mit "- vergangen"-Zusatz, falls geschenk_datum bereits vorbei ist) -
-     * die losen Tags (anlaesse()/fuer_geburtstag) werden dann bewusst ausgeblendet, nicht
-     * geloescht: macht man die Fest-Zuordnung rueckgaengig (zurueckAufOffen()), tauchen sie
-     * hier automatisch wieder auf.
+     * Ist die Idee fest zugeordnet (siehe istFest() - entweder zu einem Anlass oder zum
+     * Geburtstag), wird NUR dieses eine Ziel gezeigt (mit "- vergangen"-Zusatz, falls
+     * geschenk_datum bereits vorbei ist) - die losen Tags (anlaesse()/fuer_geburtstag) werden
+     * dann bewusst ausgeblendet, nicht geloescht: macht man die Fest-Zuordnung rueckgaengig
+     * (zurueckAufOffen()), tauchen sie hier automatisch wieder auf.
      *
      * Ist die Idee noch offen, werden die losen Verknuepfungen gezeigt: alle explizit
      * verknuepften Anlaesse (siehe anlaesse()), deren naechstes Vorkommen noch nicht vergangen
@@ -244,14 +289,24 @@ class Geschenkidee
             return [];
         }
 
-        if ($idee['geschenk_anlass_id'] !== null) {
-            $festerAnlass = Anlass::finden((int) $idee['geschenk_anlass_id']);
-            if ($festerAnlass === null) {
-                return [];
+        if (self::istFest($idee)) {
+            $istVergangen = new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
+
+            if ((int) $idee['geschenk_fuer_geburtstag'] === 1) {
+                $person = Person::finden((int) $idee['person_id']);
+                if ($person === null) {
+                    return [];
+                }
+                $name = Person::geburtstagAlsAnlass($person)['name'];
+            } else {
+                $festerAnlass = Anlass::finden((int) $idee['geschenk_anlass_id']);
+                if ($festerAnlass === null) {
+                    return [];
+                }
+                $name = $festerAnlass['name'];
             }
 
-            $istVergangen = new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
-            return [$festerAnlass['name'] . ($istVergangen ? ' - vergangen' : '')];
+            return [$name . ($istVergangen ? ' - vergangen' : '')];
         }
 
         $heute = new DateTimeImmutable('today');

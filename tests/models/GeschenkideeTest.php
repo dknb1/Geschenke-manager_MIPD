@@ -362,4 +362,64 @@ final class GeschenkideeTest extends TestCase
         $angezeigt = Geschenkidee::anlassNamenInklGeburtstag($id);
         $this->assertSame(['Zukünftiger Anlass'], $angezeigt);
     }
+
+    public function testFestMachenFuerGeburtstagSetztFlagUndDatumUndUeberschreibtDieAnzeige(): void
+    {
+        Person::erstellen('Max', '1990-06-15', null, null);
+        $personId = (int) $this->findePersonNachName('Max')['id'];
+        $inZweiMonaten = (new DateTimeImmutable('today'))->modify('+2 months')->format('Y-m-d');
+        Anlass::erstellen('Hochzeit', $inZweiMonaten, false, []);
+        $hochzeitId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null, [$hochzeitId]);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        Geschenkidee::festMachenFuerGeburtstag($id);
+
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertNull($aktualisiert['geschenk_anlass_id']);
+        $this->assertSame(1, (int) $aktualisiert['geschenk_fuer_geburtstag']);
+        $this->assertNotNull($aktualisiert['geschenk_datum']);
+
+        $this->assertTrue(Geschenkidee::istFest($aktualisiert));
+        // Nur noch der Geburtstag wird angezeigt, die lose Hochzeit-Verknuepfung verschwindet
+        // aus der Anzeige (bleibt aber in der DB, siehe zurueckAufOffen()-Test).
+        $this->assertSame(['Geburtstag Max'], Geschenkidee::anlassNamenInklGeburtstag($id));
+    }
+
+    public function testFestMachenFuerGeburtstagUndFestMachenSchliessenSichGegenseitigAus(): void
+    {
+        $inZweiMonaten = (new DateTimeImmutable('today'))->modify('+2 months')->format('Y-m-d');
+        Person::erstellen('Anna', '1985-03-20', null, null);
+        $personId = (int) $this->findePersonNachName('Anna')['id'];
+        Anlass::erstellen('Hochzeit', $inZweiMonaten, false, []);
+        $hochzeitId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        Geschenkidee::festMachenFuerGeburtstag($id);
+        Geschenkidee::festMachen($id, $hochzeitId);
+
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertSame($hochzeitId, (int) $aktualisiert['geschenk_anlass_id']);
+        $this->assertSame(0, (int) $aktualisiert['geschenk_fuer_geburtstag']);
+        $this->assertSame(['Hochzeit'], Geschenkidee::anlassNamenInklGeburtstag($id));
+    }
+
+    public function testZurueckAufOffenSetztAuchGeburtstagsFestFlagZurueck(): void
+    {
+        Person::erstellen('Tim', '1990-01-01', null, null);
+        $personId = (int) $this->findePersonNachName('Tim')['id'];
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        Geschenkidee::festMachenFuerGeburtstag($id);
+        Geschenkidee::zurueckAufOffen($id);
+
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertFalse(Geschenkidee::istFest($aktualisiert));
+        $this->assertSame(0, (int) $aktualisiert['geschenk_fuer_geburtstag']);
+        $this->assertNull($aktualisiert['geschenk_datum']);
+    }
 }

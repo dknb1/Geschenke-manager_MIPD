@@ -44,7 +44,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($aktion === 'fest_machen') {
-        $zielAnlassId = filter_input(INPUT_POST, 'geschenk_anlass_id', FILTER_VALIDATE_INT);
+        $zielWert = trim($_POST['geschenk_anlass_id'] ?? '');
+
+        if ($zielWert === 'geburtstag') {
+            Geschenkidee::festMachenFuerGeburtstag($id);
+            header('Location: idee-bearbeiten.php?id=' . $id);
+            exit;
+        }
+
+        $zielAnlassId = filter_var($zielWert, FILTER_VALIDATE_INT);
         $gueltigeFestAnlassIds = array_column($gueltigeFestAnlaesse, 'id');
 
         if ($zielAnlassId && in_array($zielAnlassId, $gueltigeFestAnlassIds, true)) {
@@ -115,9 +123,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $personen = Person::alle();
 $anlaesse = Anlass::alle();
 $aktuellePerson = Person::finden((int) $personId);
-$festerAnlass = $idee['geschenk_anlass_id'] !== null ? Anlass::finden((int) $idee['geschenk_anlass_id']) : null;
-$festIstVergangen = $festerAnlass !== null
-    && new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
+
+$istFest = Geschenkidee::istFest($idee);
+$festName = null;
+if ($istFest) {
+    $festName = (int) $idee['geschenk_fuer_geburtstag'] === 1
+        ? 'Geburtstag' . ($aktuellePerson !== null ? ' von ' . $aktuellePerson['name'] : '')
+        : (Anlass::finden((int) $idee['geschenk_anlass_id'])['name'] ?? null);
+}
+$festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -175,9 +189,9 @@ $festIstVergangen = $festerAnlass !== null
             Diese Idee ist auch für den Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?> gedacht
         </label>
 
-        <?php if ($festerAnlass !== null): ?>
+        <?php if ($istFest): ?>
             <p>
-                Fest zugeordnet zu: <strong><?= htmlspecialchars($festerAnlass['name']) ?></strong>
+                Fest zugeordnet zu: <strong><?= htmlspecialchars($festName) ?></strong>
                 am <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>
                 <?php if ($festIstVergangen): ?><strong>(vergangen)</strong><?php endif; ?>
             </p>
@@ -185,6 +199,7 @@ $festIstVergangen = $festerAnlass !== null
             <label for="geschenk_anlass_id">Fest zuordnen zu (macht diese Idee zum Geschenk für genau diesen Anlass):</label>
             <select id="geschenk_anlass_id" name="geschenk_anlass_id">
                 <option value="">Anlass auswählen</option>
+                <option value="geburtstag">Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?></option>
                 <?php foreach ($gueltigeFestAnlaesse as $anlass): ?>
                     <option value="<?= (int) $anlass['id'] ?>"><?= htmlspecialchars($anlass['name']) ?></option>
                 <?php endforeach; ?>
@@ -193,7 +208,7 @@ $festIstVergangen = $festerAnlass !== null
 
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
 
-        <?php if ($festerAnlass !== null): ?>
+        <?php if ($istFest): ?>
             <button type="submit" name="aktion" value="offen_setzen">Fest-Zuordnung aufheben</button>
         <?php else: ?>
             <button type="submit" name="aktion" value="fest_machen">Fest machen</button>

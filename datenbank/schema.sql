@@ -43,15 +43,20 @@ CREATE TABLE IF NOT EXISTS personen (
 -- (z. B. ein reines Hochzeitsgeschenk oder eine Idee ganz ohne Anlass) - deshalb eigenes,
 -- explizit zu setzendes Flag statt einer automatischen Verknuepfung. Kein Fremdschluessel auf
 -- anlaesse noetig/moeglich, da Geburtstage bewusst keine eigene Zeile dort haben (s. o.).
--- geschenk_anlass_id/geschenk_datum: die "Idee -> Geschenk"-Umwandlung (Aufgabenstellung:
--- "inkl. Anlass und Datum"). Bewusst kein separates Statusfeld - offen = geschenk_anlass_id
--- IS NULL, fest = gesetzt, vergangen/geschenkt = fest UND geschenk_datum in der Vergangenheit
--- (siehe Geschenkidee::anlassNamenInklGeburtstag()). geschenk_datum wird beim Fest-Machen aus
--- Anlass::naechstesVorkommen() eingefroren, nicht live nachberechnet - sonst koennte ein
--- wiederkehrender Anlass (dessen naechstesVorkommen() nie in der Vergangenheit liegt) niemals
--- als "vergangen" erkannt werden. ON DELETE SET NULL statt CASCADE: loescht man den fest
--- zugeordneten Anlass, soll die Idee erhalten bleiben und nur auf "offen" zurueckfallen, nicht
--- mitgeloescht werden (analog zur Idee-bleibt-erhalten-Regel bei geschenkidee_anlaesse unten).
+-- geschenk_anlass_id/geschenk_fuer_geburtstag/geschenk_datum: die "Idee -> Geschenk"-
+-- Umwandlung (Aufgabenstellung: "inkl. Anlass und Datum"). Bewusst kein separates Statusfeld -
+-- offen = geschenk_anlass_id IS NULL UND geschenk_fuer_geburtstag = 0, fest = eines von beiden
+-- gesetzt, vergangen/geschenkt = fest UND geschenk_datum in der Vergangenheit (siehe
+-- Geschenkidee::anlassNamenInklGeburtstag()). geschenk_fuer_geburtstag existiert separat von
+-- geschenk_anlass_id (statt eines Fremdschluessels), weil der Geburtstag - genau wie bei
+-- fuer_geburtstag oben - keine eigene Zeile in anlaesse hat, aber trotzdem ein gueltiges Ziel
+-- fuer eine feste Zuordnung sein muss (der naheliegendste Anlass ueberhaupt). geschenk_datum
+-- wird beim Fest-Machen aus Anlass::naechstesVorkommen() eingefroren, nicht live
+-- nachberechnet - sonst koennte ein wiederkehrender Anlass (dessen naechstesVorkommen() nie in
+-- der Vergangenheit liegt) niemals als "vergangen" erkannt werden. ON DELETE SET NULL statt
+-- CASCADE bei geschenk_anlass_id: loescht man den fest zugeordneten Anlass, soll die Idee
+-- erhalten bleiben und nur auf "offen" zurueckfallen, nicht mitgeloescht werden (analog zur
+-- Idee-bleibt-erhalten-Regel bei geschenkidee_anlaesse unten).
 CREATE TABLE IF NOT EXISTS geschenkideen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL REFERENCES personen(id) ON DELETE CASCADE,
@@ -60,6 +65,7 @@ CREATE TABLE IF NOT EXISTS geschenkideen (
     bild_link TEXT,
     fuer_geburtstag INTEGER NOT NULL DEFAULT 0,
     geschenk_anlass_id INTEGER REFERENCES anlaesse(id) ON DELETE SET NULL,
+    geschenk_fuer_geburtstag INTEGER NOT NULL DEFAULT 0,
     geschenk_datum TEXT,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
