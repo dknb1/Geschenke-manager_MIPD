@@ -55,36 +55,119 @@ class Anlass
         return $anlass !== false ? $anlass : null;
     }
 
-    public static function erstellen(string $name, string $datum, bool $wiederholtJaehrlich, ?string $personName): void
+    /**
+     * @param int[] $personIds IDs der Personen, die zu diesem Anlass gehoeren (kann leer sein -
+     *                         ein Anlass muss nicht zwingend an Personen geknuepft sein)
+     */
+    public static function erstellen(string $name, string $datum, bool $wiederholtJaehrlich, array $personIds = []): void
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
-            'INSERT INTO anlaesse (name, datum, wiederholt_jaehrlich, person_name)
-             VALUES (:name, :datum, :wiederholt, :person)'
+            'INSERT INTO anlaesse (name, datum, wiederholt_jaehrlich)
+             VALUES (:name, :datum, :wiederholt)'
         );
         $stmt->execute([
             'name' => $name,
             'datum' => $datum,
             'wiederholt' => $wiederholtJaehrlich ? 1 : 0,
-            'person' => $personName,
         ]);
+
+        self::personenVerknuepfen($pdo, (int) $pdo->lastInsertId(), $personIds);
     }
 
-    public static function aktualisieren(int $id, string $name, string $datum, bool $wiederholtJaehrlich, ?string $personName): void
+    /**
+     * @param int[] $personIds Wird für geschuetzte Anlaesse (z. B. Weihnachten) ignoriert -
+     *                         die betreffen laut Fachlichkeit alle Personen gleichzeitig und
+     *                         duerfen keiner einzelnen Person zugeordnet werden. Aus demselben
+     *                         Grund bleibt bei geschuetzten Anlaessen auch $wiederholtJaehrlich
+     *                         unveraendert - wuerde man es auf "nein" umstellen, wuerde
+     *                         naechstesVorkommen() das Datum stumpf einfrieren statt es
+     *                         jaehrlich hochzuzaehlen.
+     */
+    public static function aktualisieren(int $id, string $name, string $datum, bool $wiederholtJaehrlich, array $personIds = []): void
     {
         $pdo = Datenbank::verbinden();
+        $anlass = self::finden($id);
+
+        if ($anlass !== null && (int) $anlass['geschuetzt'] === 1) {
+            $personIds = [];
+            $wiederholtJaehrlich = (bool) $anlass['wiederholt_jaehrlich'];
+        }
+
         $stmt = $pdo->prepare(
             'UPDATE anlaesse
-             SET name = :name, datum = :datum, wiederholt_jaehrlich = :wiederholt, person_name = :person
+             SET name = :name, datum = :datum, wiederholt_jaehrlich = :wiederholt
              WHERE id = :id'
         );
         $stmt->execute([
             'name' => $name,
             'datum' => $datum,
             'wiederholt' => $wiederholtJaehrlich ? 1 : 0,
-            'person' => $personName,
             'id' => $id,
         ]);
+
+        self::personenVerknuepfen($pdo, $id, $personIds);
+    }
+
+    /**
+     * Ersetzt die komplette Personen-Verknuepfung eines Anlasses durch $personIds (loeschen +
+     * neu anlegen statt Diff, da die Mengen im Prototyp-Umfang klein sind).
+     *
+     * @param int[] $personIds
+     */
+    private static function personenVerknuepfen(PDO $pdo, int $anlassId, array $personIds): void
+    {
+        $pdo->prepare('DELETE FROM anlass_personen WHERE anlass_id = :anlass_id')
+            ->execute(['anlass_id' => $anlassId]);
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO anlass_personen (anlass_id, person_id) VALUES (:anlass_id, :person_id)'
+        );
+        foreach (array_unique($personIds) as $personId) {
+            $stmt->execute(['anlass_id' => $anlassId, 'person_id' => $personId]);
+        }
+    }
+
+    /**
+     * Alle Personen, die zu diesem Anlass gehoeren (alphabetisch sortiert).
+     */
+    public static function personen(int $anlassId): array
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'SELECT personen.*
+             FROM anlass_personen
+             JOIN personen ON personen.id = anlass_personen.person_id
+             WHERE anlass_personen.anlass_id = :anlass_id
+             ORDER BY personen.name COLLATE NOCASE'
+        );
+        $stmt->execute(['anlass_id' => $anlassId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Alle individuellen Anlässe, die mit dieser Person verknüpft sind, sortiert nach
+     * nächstem Vorkommen. Enthält NICHT den automatisch berechneten Geburtstag der Person
+     * (siehe Person::geburtstagAlsAnlass()) - der ist kein echter anlaesse-Datensatz.
+     */
+    public static function vonPerson(int $personId): array
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'SELECT anlaesse.*
+             FROM anlass_personen
+             JOIN anlaesse ON anlaesse.id = anlass_personen.anlass_id
+             WHERE anlass_personen.person_id = :person_id'
+        );
+        $stmt->execute(['person_id' => $personId]);
+        $anlaesse = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        usort(
+            $anlaesse,
+            fn (array $a, array $b) => self::naechstesVorkommen($a) <=> self::naechstesVorkommen($b)
+        );
+
+        return $anlaesse;
     }
 
     /**

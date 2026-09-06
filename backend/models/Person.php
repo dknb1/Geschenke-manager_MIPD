@@ -33,36 +33,70 @@ class Person
         return $person !== false ? $person : null;
     }
 
-    public static function erstellen(string $name, ?int $alter, ?string $geschlecht, ?string $details): void
+    public static function erstellen(string $name, string $geburtsdatum, ?string $geschlecht, ?string $details): void
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
-            'INSERT INTO personen (name, "alter", geschlecht, details)
-             VALUES (:name, :alter, :geschlecht, :details)'
+            'INSERT INTO personen (name, geburtsdatum, geschlecht, details)
+             VALUES (:name, :geburtsdatum, :geschlecht, :details)'
         );
         $stmt->execute([
             'name' => $name,
-            'alter' => $alter,
+            'geburtsdatum' => $geburtsdatum,
             'geschlecht' => $geschlecht,
             'details' => $details,
         ]);
     }
 
-    public static function aktualisieren(int $id, string $name, ?int $alter, ?string $geschlecht, ?string $details): void
+    public static function aktualisieren(int $id, string $name, string $geburtsdatum, ?string $geschlecht, ?string $details): void
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
             'UPDATE personen
-             SET name = :name, "alter" = :alter, geschlecht = :geschlecht, details = :details
+             SET name = :name, geburtsdatum = :geburtsdatum, geschlecht = :geschlecht, details = :details
              WHERE id = :id'
         );
         $stmt->execute([
             'name' => $name,
-            'alter' => $alter,
+            'geburtsdatum' => $geburtsdatum,
             'geschlecht' => $geschlecht,
             'details' => $details,
             'id' => $id,
         ]);
+    }
+
+    /**
+     * Live berechnetes Alter aus dem Geburtsdatum, analog zu Anlass::naechstesVorkommen()
+     * keine gespeicherte Spalte - ein statisch eingetragenes Alter wuerde sonst mit der Zeit
+     * veralten, ohne dass es jemand nachtraegt. $heute ist fuer Tests injizierbar.
+     */
+    public static function alter(array $person, ?DateTimeImmutable $heute = null): int
+    {
+        $geburtsdatum = new DateTimeImmutable($person['geburtsdatum']);
+        $heute ??= new DateTimeImmutable('today');
+
+        return $heute->diff($geburtsdatum)->y;
+    }
+
+    /**
+     * Repraesentiert den Geburtstag dieser Person als Anlass-foermiges Array (gleiche
+     * 'datum'/'wiederholt_jaehrlich'-Struktur wie eine anlaesse-Zeile), damit er ueber
+     * Anlass::naechstesVorkommen() berechnet und in der Anlassliste einsortiert werden kann -
+     * ohne als eigene Zeile in der anlaesse-Tabelle dupliziert zu werden (siehe fachliche
+     * Dokumentation, Abschnitt "Pflichtanlässe").
+     */
+    public static function geburtstagAlsAnlass(array $person): array
+    {
+        return [
+            'id' => null,
+            'name' => 'Geburtstag ' . $person['name'],
+            'datum' => $person['geburtsdatum'],
+            'wiederholt_jaehrlich' => 1,
+            'geschuetzt' => 1,
+            'person_name' => null,
+            'ist_geburtstag' => true,
+            'person_id' => (int) $person['id'],
+        ];
     }
 
     public static function loeschen(int $id): bool
@@ -88,13 +122,20 @@ class Person
         return (bool) preg_match('/^[\p{L}\s\'\-]{1,100}$/u', $name);
     }
 
-    public static function istGueltigesAlter(string $alter): bool
+    /**
+     * Geburtsdatum ist Pflichtfeld (analog zu Weihnachten als "obligatorischer" Anlass,
+     * siehe fachliche Dokumentation) - Leerstring wird deshalb hier bewusst NICHT akzeptiert,
+     * die Pflichtfeldpruefung erfolgt separat mit eigener Fehlermeldung wie bei istGueltigerName().
+     * Gueltiges Y-m-d-Datum, das nicht in der Zukunft liegt.
+     */
+    public static function istGueltigesGeburtsdatum(string $geburtsdatum): bool
     {
-        if ($alter === '') {
-            return true;
-        }
+        $datum = DateTime::createFromFormat('Y-m-d', $geburtsdatum);
 
-        return (bool) preg_match('/^\d{1,3}$/', $alter) && (int) $alter <= 120;
+        // Vergleich ueber den formatierten Datumsstring statt des DateTime-Objekts direkt:
+        // createFromFormat('Y-m-d', ...) uebernimmt fuer die nicht angegebene Uhrzeit die
+        // aktuelle Systemzeit, wodurch "heute" faelschlich als "in der Zukunft" durchfiele.
+        return $datum !== false && $datum->format('Y-m-d') <= (new DateTime('today'))->format('Y-m-d');
     }
 
     public static function istGueltigesGeschlecht(string $geschlecht): bool

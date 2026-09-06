@@ -28,6 +28,9 @@ class Datenbank
     {
         $verbindung = new PDO('sqlite:' . $pfad);
         $verbindung->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // Ohne dieses Pragma ignoriert SQLite REFERENCES/ON DELETE CASCADE stillschweigend
+        // (Fremdschluessel werden pro Verbindung, nicht global, aktiviert).
+        $verbindung->exec('PRAGMA foreign_keys = ON');
         $verbindung->exec(file_get_contents(__DIR__ . '/../../datenbank/schema.sql'));
         self::seedStandardanlaesse($verbindung);
 

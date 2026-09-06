@@ -3,6 +3,7 @@
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../backend/models/Anlass.php';
+require_once __DIR__ . '/../../backend/models/Person.php';
 
 final class AnlassTest extends TestCase
 {
@@ -35,7 +36,7 @@ final class AnlassTest extends TestCase
 
     public function testErstellenUndAlle(): void
     {
-        Anlass::erstellen('Testgeburtstag', '2026-09-12', true, 'Max');
+        Anlass::erstellen('Testgeburtstag', '2026-09-12', true, []);
 
         $angelegt = $this->findeAnlassNachName('Testgeburtstag');
 
@@ -50,25 +51,120 @@ final class AnlassTest extends TestCase
 
     public function testAktualisierenAendertWerte(): void
     {
-        Anlass::erstellen('Alter Name', '2026-01-01', false, null);
+        Anlass::erstellen('Alter Name', '2026-01-01', false, []);
         $id = (int) $this->findeAnlassNachName('Alter Name')['id'];
 
-        Anlass::aktualisieren($id, 'Neuer Name', '2026-02-02', true, 'Anna');
+        Anlass::aktualisieren($id, 'Neuer Name', '2026-02-02', true, []);
 
         $aktualisiert = Anlass::finden($id);
         $this->assertSame('Neuer Name', $aktualisiert['name']);
-        $this->assertSame('Anna', $aktualisiert['person_name']);
+        $this->assertSame('2026-02-02', $aktualisiert['datum']);
     }
 
     public function testLoeschenEntferntEintrag(): void
     {
-        Anlass::erstellen('Zu löschen', '2026-03-03', false, null);
+        Anlass::erstellen('Zu löschen', '2026-03-03', false, []);
         $id = (int) $this->findeAnlassNachName('Zu löschen')['id'];
 
         $erfolg = Anlass::loeschen($id);
 
         $this->assertTrue($erfolg);
         $this->assertFalse($this->gibtEsAnlassMitName('Zu löschen'));
+    }
+
+    public function testErstellenVerknuepftMehrerePersonen(): void
+    {
+        Person::erstellen('Max', '1990-01-01', null, null);
+        Person::erstellen('Anna', '1992-02-02', null, null);
+        $maxId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Max'))[0]['id'];
+        $annaId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Anna'))[0]['id'];
+
+        Anlass::erstellen('Hochzeitstag', '2026-06-01', true, [$maxId, $annaId]);
+        $id = (int) $this->findeAnlassNachName('Hochzeitstag')['id'];
+
+        $namen = array_column(Anlass::personen($id), 'name');
+        sort($namen);
+        $this->assertSame(['Anna', 'Max'], $namen);
+    }
+
+    public function testAktualisierenErsetztPersonenverknuepfungKomplett(): void
+    {
+        Person::erstellen('Max', '1990-01-01', null, null);
+        Person::erstellen('Anna', '1992-02-02', null, null);
+        $maxId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Max'))[0]['id'];
+        $annaId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Anna'))[0]['id'];
+
+        Anlass::erstellen('Anlass mit Max', '2026-06-01', false, [$maxId]);
+        $id = (int) $this->findeAnlassNachName('Anlass mit Max')['id'];
+
+        Anlass::aktualisieren($id, 'Anlass mit Max', '2026-06-01', false, [$annaId]);
+
+        $namen = array_column(Anlass::personen($id), 'name');
+        $this->assertSame(['Anna'], $namen);
+    }
+
+    public function testLoeschenEntferntAuchPersonenverknuepfung(): void
+    {
+        Person::erstellen('Max', '1990-01-01', null, null);
+        $maxId = (int) Person::alle()[0]['id'];
+
+        Anlass::erstellen('Anlass mit Max', '2026-06-01', false, [$maxId]);
+        $id = (int) $this->findeAnlassNachName('Anlass mit Max')['id'];
+
+        Anlass::loeschen($id);
+
+        $this->assertCount(0, Anlass::personen($id));
+    }
+
+    public function testVonPersonLiefertNurAnlaesseDieserPerson(): void
+    {
+        Person::erstellen('Max', '1990-01-01', null, null);
+        Person::erstellen('Anna', '1992-02-02', null, null);
+        $maxId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Max'))[0]['id'];
+        $annaId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Anna'))[0]['id'];
+
+        Anlass::erstellen('Anlass mit Max', '2026-06-01', false, [$maxId]);
+        Anlass::erstellen('Anlass mit Anna', '2026-07-01', false, [$annaId]);
+
+        $namenVonMax = array_column(Anlass::vonPerson($maxId), 'name');
+
+        $this->assertSame(['Anlass mit Max'], $namenVonMax);
+    }
+
+    public function testGeschuetzterAnlassKannKeinerPersonZugeordnetWerden(): void
+    {
+        Person::erstellen('Max', '1990-01-01', null, null);
+        $maxId = (int) Person::alle()[0]['id'];
+        $weihnachten = $this->findeAnlassNachName('Weihnachten');
+
+        Anlass::aktualisieren(
+            (int) $weihnachten['id'],
+            $weihnachten['name'],
+            $weihnachten['datum'],
+            true,
+            [$maxId]
+        );
+
+        $this->assertCount(0, Anlass::personen((int) $weihnachten['id']));
+    }
+
+    public function testGeschuetzterAnlassBehaeltWiederholtJaehrlichBeiAktualisieren(): void
+    {
+        $weihnachten = $this->findeAnlassNachName('Weihnachten');
+        $this->assertSame(1, (int) $weihnachten['wiederholt_jaehrlich']);
+
+        // Versuch, die Wiederholung abzuschalten - muss ignoriert werden, sonst wuerde
+        // naechstesVorkommen() das Datum kuenftig stumpf einfrieren statt hochzuzaehlen.
+        Anlass::aktualisieren(
+            (int) $weihnachten['id'],
+            $weihnachten['name'],
+            $weihnachten['datum'],
+            false,
+            []
+        );
+
+        $aktualisiert = Anlass::finden((int) $weihnachten['id']);
+        $this->assertSame(1, (int) $aktualisiert['wiederholt_jaehrlich']);
     }
 
     public function testWeihnachtenIstStandardmaessigVorhandenUndGeschuetzt(): void
@@ -125,8 +221,8 @@ final class AnlassTest extends TestCase
         $inZweiTagen = $heute->modify('+2 days');
         $vorEinemMonatWiederkehrend = $heute->modify('-1 month');
 
-        Anlass::erstellen('Bald', $inZweiTagen->format('Y-m-d'), false, null);
-        Anlass::erstellen('Wiederkehrend spaeter', $vorEinemMonatWiederkehrend->format('Y-m-d'), true, null);
+        Anlass::erstellen('Bald', $inZweiTagen->format('Y-m-d'), false, []);
+        Anlass::erstellen('Wiederkehrend spaeter', $vorEinemMonatWiederkehrend->format('Y-m-d'), true, []);
 
         $namen = array_map(fn (array $a) => $a['name'], Anlass::alle());
 

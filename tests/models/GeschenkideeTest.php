@@ -14,8 +14,19 @@ final class GeschenkideeTest extends TestCase
 
     private function testPersonAnlegen(string $name = 'Anna'): int
     {
-        Person::erstellen($name, null, null, null);
-        return (int) Person::alle()[0]['id'];
+        Person::erstellen($name, '2000-01-01', null, null);
+        return (int) $this->findePersonNachName($name)['id'];
+    }
+
+    private function findePersonNachName(string $name): array
+    {
+        foreach (Person::alle() as $person) {
+            if ($person['name'] === $name) {
+                return $person;
+            }
+        }
+
+        $this->fail("Person mit Namen '$name' wurde nicht gefunden.");
     }
 
     public function testErstellenUndAlle(): void
@@ -35,8 +46,7 @@ final class GeschenkideeTest extends TestCase
     public function testVonPersonLiefertNurIdeenDieserPerson(): void
     {
         $maxId = $this->testPersonAnlegen('Max');
-        Person::erstellen('Anna', null, null, null);
-        $annaId = (int) Person::alle()[1]['id'];
+        $annaId = $this->testPersonAnlegen('Anna');
 
         Geschenkidee::erstellen($maxId, 'Idee für Max', null, null);
         Geschenkidee::erstellen($annaId, 'Idee für Anna', null, null);

@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../backend/models/Person.php';
+require_once __DIR__ . '/../backend/models/Anlass.php';
+require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
@@ -17,9 +19,11 @@ if (!$person) {
 
 $fehler = [];
 $name = $person['name'];
-$alter = $person['alter'] !== null ? (string) $person['alter'] : '';
+$geburtsdatum = $person['geburtsdatum'];
 $geschlecht = $person['geschlecht'] ?? '';
 $details = $person['details'] ?? '';
+$verknuepfteAnlaesse = Anlass::vonPerson($id);
+$geschenkideenDieserPerson = Geschenkidee::vonPerson($id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aktion = $_POST['aktion'] ?? 'speichern';
@@ -31,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $name = trim($_POST['name'] ?? '');
-    $alter = trim($_POST['alter'] ?? '');
+    $geburtsdatum = trim($_POST['geburtsdatum'] ?? '');
     $geschlecht = $_POST['geschlecht'] ?? '';
     $details = trim($_POST['details'] ?? '');
 
@@ -41,8 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fehler[] = 'Der Name darf nur Buchstaben, Leerzeichen, Bindestriche und Apostrophe enthalten.';
     }
 
-    if (!Person::istGueltigesAlter($alter)) {
-        $fehler[] = 'Bitte ein gültiges Alter zwischen 0 und 120 angeben.';
+    if ($geburtsdatum === '') {
+        $fehler[] = 'Bitte ein Geburtsdatum angeben.';
+    } elseif (!Person::istGueltigesGeburtsdatum($geburtsdatum)) {
+        $fehler[] = 'Bitte ein gültiges Geburtsdatum angeben (nicht in der Zukunft).';
     }
 
     if (!Person::istGueltigesGeschlecht($geschlecht)) {
@@ -57,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Person::aktualisieren(
             $id,
             $name,
-            $alter !== '' ? (int) $alter : null,
+            $geburtsdatum,
             $geschlecht !== '' ? $geschlecht : null,
             $details !== '' ? $details : null
         );
@@ -94,8 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label for="name">Name:</label>
         <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" maxlength="100" required>
 
-        <label for="alter">Alter:</label>
-        <input type="number" id="alter" name="alter" value="<?= htmlspecialchars($alter) ?>" min="0" max="120">
+        <label for="geburtsdatum">Geburtsdatum:</label>
+        <input type="date" id="geburtsdatum" name="geburtsdatum" value="<?= htmlspecialchars($geburtsdatum) ?>" required>
 
         <label for="geschlecht">Geschlecht:</label>
         <select id="geschlecht" name="geschlecht">
@@ -113,6 +119,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit" name="aktion" value="loeschen">Person löschen</button>
 
     </form>
+
+    <h2>Anlässe von <?= htmlspecialchars($name) ?></h2>
+
+    <?php $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person); ?>
+    <p>
+        <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> - <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
+        <strong>(Geburtstag)</strong>
+    </p>
+
+    <?php if (empty($verknuepfteAnlaesse)): ?>
+        <p>Keine weiteren Anlässe hinterlegt.</p>
+    <?php else: ?>
+        <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
+            <a href="anlass-bearbeiten.php?id=<?= (int) $verknuepfterAnlass['id'] ?>">
+                <?= htmlspecialchars($verknuepfterAnlass['name']) ?> - <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
+            </a>
+        <?php endforeach; ?>
+    <?php endif; ?>
+
+    <h2>Geschenkideen für <?= htmlspecialchars($name) ?></h2>
+
+    <?php if (empty($geschenkideenDieserPerson)): ?>
+        <p>Keine Geschenkideen hinterlegt.</p>
+    <?php else: ?>
+        <ul class="ideen-liste">
+            <?php foreach ($geschenkideenDieserPerson as $idee): ?>
+                <li>
+                    <?php if (!empty($idee['text'])): ?>
+                        <?= htmlspecialchars($idee['text']) ?>
+                    <?php endif; ?>
+                    <?php if (!empty($idee['link'])): ?>
+                        <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
+                    <?php endif; ?>
+                    <?php if (!empty($idee['bild_link'])): ?>
+                        <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
 
     <a href="person-anzeigen.php">Zurück zur Personenübersicht</a>
 
