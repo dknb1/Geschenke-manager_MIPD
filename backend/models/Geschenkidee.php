@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../config/Datenbank.php';
 require_once __DIR__ . '/Anlass.php';
+require_once __DIR__ . '/Person.php';
 
 class Geschenkidee
 {
@@ -151,6 +152,32 @@ class Geschenkidee
         );
 
         return $anlaesse;
+    }
+
+    /**
+     * Namen aller Anlaesse, die zu dieser Idee passen: die explizit verknuepften (siehe
+     * anlaesse()) plus automatisch immer der Geburtstag der Person, fuer die die Idee gedacht
+     * ist - eine Geschenkidee ist implizit immer auch fuer den Geburtstag ihrer eigenen Person
+     * relevant, dafuer ist keine gesonderte Auswahl noetig (der Geburtstag ist ja bereits durch
+     * die Personen-Zuordnung der Idee eindeutig bestimmt, siehe fachliche Dokumentation).
+     * Rein zur Anzeige - der Geburtstag wird nicht in geschenkidee_anlaesse gespeichert, genau
+     * wie er auch nicht als eigene Zeile in anlaesse steht (siehe Person::geburtstagAlsAnlass()).
+     */
+    public static function anlassNamenInklGeburtstag(int $geschenkideeId): array
+    {
+        $idee = self::finden($geschenkideeId);
+        if ($idee === null) {
+            return [];
+        }
+
+        $namen = array_column(self::anlaesse($geschenkideeId), 'name');
+
+        $person = Person::finden((int) $idee['person_id']);
+        if ($person !== null) {
+            array_unshift($namen, Person::geburtstagAlsAnlass($person)['name']);
+        }
+
+        return $namen;
     }
 
     /**

@@ -81,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $personen = Person::alle();
 $anlaesse = Anlass::alle();
+$aktuellePerson = Person::finden((int) $personId);
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -127,12 +128,16 @@ $anlaesse = Anlass::alle();
         <label for="bild_link">Bild (Link):</label>
         <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
 
-        <label for="anlass_ids">Anlässe (optional, Mehrfachauswahl möglich):</label>
+        <label for="anlass_ids">Weitere Anlässe (optional, Mehrfachauswahl möglich):</label>
         <select id="anlass_ids" name="anlass_ids[]" multiple size="8">
             <?php foreach ($anlaesse as $anlass): ?>
                 <option value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($anlass['name']) ?></option>
             <?php endforeach; ?>
         </select>
+        <?php if ($aktuellePerson !== null): ?>
+            <p>Die Idee gilt automatisch auch als Geburtstagsidee für <?= htmlspecialchars($aktuellePerson['name']) ?> -
+                dafür ist keine gesonderte Auswahl nötig.</p>
+        <?php endif; ?>
 
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
 

@@ -209,4 +209,31 @@ final class GeschenkideeTest extends TestCase
         $this->assertNotNull(Geschenkidee::finden($id));
         $this->assertCount(0, Geschenkidee::anlaesse($id));
     }
+
+    public function testAnlassNamenInklGeburtstagEnthaeltAutomatischDenGeburtstag(): void
+    {
+        Person::erstellen('Max', '1990-06-15', null, null);
+        $personId = (int) $this->findePersonNachName('Max')['id'];
+        Anlass::erstellen('Weihnachtsfeier', '2026-12-01', true, []);
+        $anlassId = (int) $this->findeAnlassNachName('Weihnachtsfeier')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee für Max', null, null, [$anlassId]);
+        $id = (int) $this->findeIdeeNachText('Idee für Max')['id'];
+
+        $namen = Geschenkidee::anlassNamenInklGeburtstag($id);
+
+        $this->assertContains('Weihnachtsfeier', $namen);
+        $this->assertContains('Geburtstag Max', $namen);
+    }
+
+    public function testAnlassNamenInklGeburtstagOhneWeitereVerknuepfungEnthaeltNurGeburtstag(): void
+    {
+        Person::erstellen('Anna', '1985-03-20', null, null);
+        $personId = (int) $this->findePersonNachName('Anna')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee ohne Anlass', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee ohne Anlass')['id'];
+
+        $this->assertSame(['Geburtstag Anna'], Geschenkidee::anlassNamenInklGeburtstag($id));
+    }
 }

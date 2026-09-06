@@ -103,12 +103,14 @@ $ideen = Geschenkidee::alle();
         <label for="bild_link">Bild (Link):</label>
         <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
 
-        <label for="anlass_ids">Anlässe (optional, Mehrfachauswahl möglich):</label>
+        <label for="anlass_ids">Weitere Anlässe (optional, Mehrfachauswahl möglich):</label>
         <select id="anlass_ids" name="anlass_ids[]" multiple size="8">
             <?php foreach ($anlaesse as $anlass): ?>
                 <option value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($anlass['name']) ?></option>
             <?php endforeach; ?>
         </select>
+        <p>Die Idee gilt automatisch auch als Geburtstagsidee für die ausgewählte Person - dafür
+            ist keine gesonderte Auswahl nötig.</p>
 
         <button type="submit">Idee speichern</button>
 
@@ -121,7 +123,7 @@ $ideen = Geschenkidee::alle();
     <?php else: ?>
         <ul class="ideen-liste">
             <?php foreach ($ideen as $idee): ?>
-                <?php $verknuepfteAnlaesse = Geschenkidee::anlaesse((int) $idee['id']); ?>
+                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
                     <strong><?= htmlspecialchars($idee['person_name']) ?>:</strong>
                     <?php if (!empty($idee['text'])): ?>
@@ -133,8 +135,8 @@ $ideen = Geschenkidee::alle();
                     <?php if (!empty($idee['bild_link'])): ?>
                         <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
                     <?php endif; ?>
-                    <?php if (!empty($verknuepfteAnlaesse)): ?>
-                        (<?= htmlspecialchars(implode(', ', array_column($verknuepfteAnlaesse, 'name'))) ?>)
+                    <?php if (!empty($anlassNamen)): ?>
+                        (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
                     <?php endif; ?>
                     <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">Bearbeiten</a>
                 </li>
