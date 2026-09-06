@@ -57,19 +57,24 @@ class Geschenkidee
     /**
      * @param int[] $anlassIds IDs der Anlaesse, zu denen diese Idee passt (kann leer sein -
      *                         eine Idee muss nicht zwingend einem Anlass zugeordnet sein)
+     * @param bool $fuerGeburtstag Ob die Idee (zusaetzlich) fuer den Geburtstag der Person
+     *                             gedacht ist - explizit statt automatisch, da eine Idee auch
+     *                             ausschliesslich fuer einen anderen Anlass (z. B. Hochzeit)
+     *                             oder ganz ohne Anlass gedacht sein kann
      */
-    public static function erstellen(int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = []): void
+    public static function erstellen(int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = [], bool $fuerGeburtstag = false): void
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
-            'INSERT INTO geschenkideen (person_id, text, link, bild_link)
-             VALUES (:person_id, :text, :link, :bild_link)'
+            'INSERT INTO geschenkideen (person_id, text, link, bild_link, fuer_geburtstag)
+             VALUES (:person_id, :text, :link, :bild_link, :fuer_geburtstag)'
         );
         $stmt->execute([
             'person_id' => $personId,
             'text' => $text,
             'link' => $link,
             'bild_link' => $bildLink,
+            'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
         ]);
 
         self::anlaesseVerknuepfen($pdo, (int) $pdo->lastInsertId(), $anlassIds);
@@ -78,12 +83,13 @@ class Geschenkidee
     /**
      * @param int[] $anlassIds
      */
-    public static function aktualisieren(int $id, int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = []): void
+    public static function aktualisieren(int $id, int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = [], bool $fuerGeburtstag = false): void
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
-             SET person_id = :person_id, text = :text, link = :link, bild_link = :bild_link
+             SET person_id = :person_id, text = :text, link = :link, bild_link = :bild_link,
+                 fuer_geburtstag = :fuer_geburtstag
              WHERE id = :id'
         );
         $stmt->execute([
@@ -91,6 +97,7 @@ class Geschenkidee
             'text' => $text,
             'link' => $link,
             'bild_link' => $bildLink,
+            'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
             'id' => $id,
         ]);
 
@@ -156,10 +163,10 @@ class Geschenkidee
 
     /**
      * Namen aller Anlaesse, die zu dieser Idee passen: die explizit verknuepften (siehe
-     * anlaesse()) plus automatisch immer der Geburtstag der Person, fuer die die Idee gedacht
-     * ist - eine Geschenkidee ist implizit immer auch fuer den Geburtstag ihrer eigenen Person
-     * relevant, dafuer ist keine gesonderte Auswahl noetig (der Geburtstag ist ja bereits durch
-     * die Personen-Zuordnung der Idee eindeutig bestimmt, siehe fachliche Dokumentation).
+     * anlaesse()) plus - nur falls fuer_geburtstag gesetzt ist - der Geburtstag der Person.
+     * Eine Idee ist NICHT automatisch fuer den Geburtstag gedacht (kann z. B. ausschliesslich
+     * ein Hochzeitsgeschenk oder ganz ohne Anlass sein), deshalb haengt das hier vom
+     * explizit gesetzten Flag ab statt immer dabei zu sein.
      * Rein zur Anzeige - der Geburtstag wird nicht in geschenkidee_anlaesse gespeichert, genau
      * wie er auch nicht als eigene Zeile in anlaesse steht (siehe Person::geburtstagAlsAnlass()).
      */
@@ -172,9 +179,11 @@ class Geschenkidee
 
         $namen = array_column(self::anlaesse($geschenkideeId), 'name');
 
-        $person = Person::finden((int) $idee['person_id']);
-        if ($person !== null) {
-            array_unshift($namen, Person::geburtstagAlsAnlass($person)['name']);
+        if ((int) $idee['fuer_geburtstag'] === 1) {
+            $person = Person::finden((int) $idee['person_id']);
+            if ($person !== null) {
+                array_unshift($namen, Person::geburtstagAlsAnlass($person)['name']);
+            }
         }
 
         return $namen;

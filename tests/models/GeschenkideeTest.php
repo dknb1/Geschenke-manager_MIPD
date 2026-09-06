@@ -210,30 +210,50 @@ final class GeschenkideeTest extends TestCase
         $this->assertCount(0, Geschenkidee::anlaesse($id));
     }
 
-    public function testAnlassNamenInklGeburtstagEnthaeltAutomatischDenGeburtstag(): void
+    public function testAnlassNamenInklGeburtstagOhneFlagEnthaeltKeinenGeburtstag(): void
     {
+        // Eine Idee ist NICHT automatisch fuer den Geburtstag gedacht - z. B. ein reines
+        // Hochzeitsgeschenk oder eine Idee ganz ohne Anlass darf den Geburtstag nicht zeigen.
         Person::erstellen('Max', '1990-06-15', null, null);
         $personId = (int) $this->findePersonNachName('Max')['id'];
+        Anlass::erstellen('Hochzeit', '2026-06-01', true, []);
+        $anlassId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        Geschenkidee::erstellen($personId, 'Hochzeitsgeschenk', null, null, [$anlassId]);
+        $id = (int) $this->findeIdeeNachText('Hochzeitsgeschenk')['id'];
+
+        $namen = Geschenkidee::anlassNamenInklGeburtstag($id);
+
+        $this->assertSame(['Hochzeit'], $namen);
+        $this->assertNotContains('Geburtstag Max', $namen);
+    }
+
+    public function testAnlassNamenInklGeburtstagMitGesetztemFlagEnthaeltGeburtstag(): void
+    {
+        Person::erstellen('Anna', '1985-03-20', null, null);
+        $personId = (int) $this->findePersonNachName('Anna')['id'];
         Anlass::erstellen('Weihnachtsfeier', '2026-12-01', true, []);
         $anlassId = (int) $this->findeAnlassNachName('Weihnachtsfeier')['id'];
 
-        Geschenkidee::erstellen($personId, 'Idee für Max', null, null, [$anlassId]);
-        $id = (int) $this->findeIdeeNachText('Idee für Max')['id'];
+        Geschenkidee::erstellen($personId, 'Idee für Anna', null, null, [$anlassId], true);
+        $id = (int) $this->findeIdeeNachText('Idee für Anna')['id'];
 
         $namen = Geschenkidee::anlassNamenInklGeburtstag($id);
 
         $this->assertContains('Weihnachtsfeier', $namen);
-        $this->assertContains('Geburtstag Max', $namen);
+        $this->assertContains('Geburtstag Anna', $namen);
     }
 
-    public function testAnlassNamenInklGeburtstagOhneWeitereVerknuepfungEnthaeltNurGeburtstag(): void
+    public function testAktualisierenAendertGeburtstagsFlag(): void
     {
-        Person::erstellen('Anna', '1985-03-20', null, null);
-        $personId = (int) $this->findePersonNachName('Anna')['id'];
+        $personId = $this->testPersonAnlegen('Tim');
+        Geschenkidee::erstellen($personId, 'Idee für Tim', null, null, [], false);
+        $id = (int) $this->findeIdeeNachText('Idee für Tim')['id'];
 
-        Geschenkidee::erstellen($personId, 'Idee ohne Anlass', null, null);
-        $id = (int) $this->findeIdeeNachText('Idee ohne Anlass')['id'];
+        $this->assertNotContains('Geburtstag Tim', Geschenkidee::anlassNamenInklGeburtstag($id));
 
-        $this->assertSame(['Geburtstag Anna'], Geschenkidee::anlassNamenInklGeburtstag($id));
+        Geschenkidee::aktualisieren($id, $personId, 'Idee für Tim', null, null, [], true);
+
+        $this->assertContains('Geburtstag Tim', Geschenkidee::anlassNamenInklGeburtstag($id));
     }
 }

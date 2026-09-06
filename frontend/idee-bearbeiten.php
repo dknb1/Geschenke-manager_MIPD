@@ -23,6 +23,7 @@ $text = $idee['text'] ?? '';
 $link = $idee['link'] ?? '';
 $bildLink = $idee['bild_link'] ?? '';
 $anlassIds = array_map('intval', array_column(Geschenkidee::anlaesse($id), 'id'));
+$fuerGeburtstag = (int) $idee['fuer_geburtstag'] === 1;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aktion = $_POST['aktion'] ?? 'speichern';
@@ -37,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $text = trim($_POST['text'] ?? '');
     $link = trim($_POST['link'] ?? '');
     $bildLink = trim($_POST['bild_link'] ?? '');
+    $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
     $gueltigeAnlassIds = array_column(Anlass::alle(), 'id');
     $anlassIds = array_values(array_intersect(
         array_map('intval', $_POST['anlass_ids'] ?? []),
@@ -72,7 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $text !== '' ? $text : null,
             $link !== '' ? $link : null,
             $bildLink !== '' ? $bildLink : null,
-            $anlassIds
+            $anlassIds,
+            $fuerGeburtstag
         );
         header('Location: idee-speichern.php');
         exit;
@@ -134,10 +137,10 @@ $aktuellePerson = Person::finden((int) $personId);
                 <option value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($anlass['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <?php if ($aktuellePerson !== null): ?>
-            <p>Die Idee gilt automatisch auch als Geburtstagsidee für <?= htmlspecialchars($aktuellePerson['name']) ?> -
-                dafür ist keine gesonderte Auswahl nötig.</p>
-        <?php endif; ?>
+        <label>
+            <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
+            Diese Idee ist auch für den Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?> gedacht
+        </label>
 
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
 

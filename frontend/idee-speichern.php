@@ -9,12 +9,14 @@ $text = '';
 $link = '';
 $bildLink = '';
 $anlassIds = [];
+$fuerGeburtstag = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $personId = trim($_POST['person'] ?? '');
     $text = trim($_POST['text'] ?? '');
     $link = trim($_POST['link'] ?? '');
     $bildLink = trim($_POST['bild_link'] ?? '');
+    $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
     $gueltigeAnlassIds = array_column(Anlass::alle(), 'id');
     $anlassIds = array_values(array_intersect(
         array_map('intval', $_POST['anlass_ids'] ?? []),
@@ -49,7 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $text !== '' ? $text : null,
             $link !== '' ? $link : null,
             $bildLink !== '' ? $bildLink : null,
-            $anlassIds
+            $anlassIds,
+            $fuerGeburtstag
         );
         header('Location: idee-speichern.php');
         exit;
@@ -109,8 +112,11 @@ $ideen = Geschenkidee::alle();
                 <option value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($anlass['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <p>Die Idee gilt automatisch auch als Geburtstagsidee für die ausgewählte Person - dafür
-            ist keine gesonderte Auswahl nötig.</p>
+
+        <label>
+            <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
+            Diese Idee ist auch für den Geburtstag der ausgewählten Person gedacht
+        </label>
 
         <button type="submit">Idee speichern</button>
 

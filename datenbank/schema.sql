@@ -39,12 +39,17 @@ CREATE TABLE IF NOT EXISTS personen (
 -- ON DELETE CASCADE: wird eine Person geloescht, sollen ihre Geschenkideen nicht als
 -- Datenleichen mit person_id auf eine nicht mehr existierende Person zurueckbleiben.
 -- Setzt voraus, dass PRAGMA foreign_keys = ON ist (siehe Datenbank::neueVerbindung()).
+-- fuer_geburtstag: eine Idee ist NICHT zwangslaeufig fuer den Geburtstag der Person gedacht
+-- (z. B. ein reines Hochzeitsgeschenk oder eine Idee ganz ohne Anlass) - deshalb eigenes,
+-- explizit zu setzendes Flag statt einer automatischen Verknuepfung. Kein Fremdschluessel auf
+-- anlaesse noetig/moeglich, da Geburtstage bewusst keine eigene Zeile dort haben (s. o.).
 CREATE TABLE IF NOT EXISTS geschenkideen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL REFERENCES personen(id) ON DELETE CASCADE,
     text TEXT,
     link TEXT,
     bild_link TEXT,
+    fuer_geburtstag INTEGER NOT NULL DEFAULT 0,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
