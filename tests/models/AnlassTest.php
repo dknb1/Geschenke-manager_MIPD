@@ -175,6 +175,15 @@ final class AnlassTest extends TestCase
         $this->assertSame(1, (int) $weihnachten['wiederholt_jaehrlich']);
     }
 
+    public function testGeschuetzteLiefertNurGeschuetzteAnlaesse(): void
+    {
+        Anlass::erstellen('Individueller Anlass', '2026-05-01', false, []);
+
+        $namen = array_column(Anlass::geschuetzte(), 'name');
+
+        $this->assertSame(['Weihnachten'], $namen);
+    }
+
     public function testGeschuetzterAnlassKannNichtGeloeschtWerden(): void
     {
         $weihnachten = $this->findeAnlassNachName('Weihnachten');

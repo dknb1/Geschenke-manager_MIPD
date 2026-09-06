@@ -171,6 +171,21 @@ class Anlass
     }
 
     /**
+     * Alle geschuetzten Pflichtanlaesse (aktuell: Weihnachten), sortiert nach naechstem
+     * Vorkommen. Geschuetzte Anlaesse betreffen fachlich immer alle Personen gleichzeitig
+     * (siehe aktualisieren()) und werden deshalb nicht ueber anlass_personen verknuepft -
+     * fuer eine "welche Anlaesse betreffen diese Person"-Anzeige muessen sie zusaetzlich zu
+     * vonPerson() eingeblendet werden, siehe person-bearbeiten.php.
+     */
+    public static function geschuetzte(): array
+    {
+        return array_values(array_filter(
+            self::alle(),
+            fn (array $anlass) => (int) $anlass['geschuetzt'] === 1
+        ));
+    }
+
+    /**
      * Liefert false statt zu löschen, wenn der Anlass geschützt ist (z. B. Weihnachten)
      * oder gar nicht existiert.
      */

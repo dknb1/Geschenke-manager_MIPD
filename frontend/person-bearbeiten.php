@@ -22,7 +22,11 @@ $name = $person['name'];
 $geburtsdatum = $person['geburtsdatum'];
 $geschlecht = $person['geschlecht'] ?? '';
 $details = $person['details'] ?? '';
-$verknuepfteAnlaesse = Anlass::vonPerson($id);
+$verknuepfteAnlaesse = array_merge(Anlass::geschuetzte(), Anlass::vonPerson($id));
+usort(
+    $verknuepfteAnlaesse,
+    fn (array $a, array $b) => Anlass::naechstesVorkommen($a) <=> Anlass::naechstesVorkommen($b)
+);
 $geschenkideenDieserPerson = Geschenkidee::vonPerson($id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -133,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php else: ?>
         <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
             <a href="anlass-bearbeiten.php?id=<?= (int) $verknuepfterAnlass['id'] ?>">
-                <?= htmlspecialchars($verknuepfterAnlass['name']) ?> - <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
+                <?= htmlspecialchars($verknuepfterAnlass['name']) ?> - <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?><?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?> <strong>(Pflichtanlass)</strong><?php endif; ?>
             </a>
         <?php endforeach; ?>
     <?php endif; ?>
@@ -145,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php else: ?>
         <ul class="ideen-liste">
             <?php foreach ($geschenkideenDieserPerson as $idee): ?>
+                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
                     <?php if (!empty($idee['text'])): ?>
                         <?= htmlspecialchars($idee['text']) ?>
@@ -154,6 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php endif; ?>
                     <?php if (!empty($idee['bild_link'])): ?>
                         <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
+                    <?php endif; ?>
+                    <?php if (!empty($anlassNamen)): ?>
+                        (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
                     <?php endif; ?>
                     <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">Bearbeiten</a>
                 </li>
