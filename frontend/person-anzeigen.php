@@ -24,7 +24,10 @@ $personen = Person::alle();
         <p>Es wurden noch keine Personen angelegt.</p>
     <?php else: ?>
         <?php foreach ($personen as $person): ?>
-            <a href="person-bearbeiten.php?id=<?= (int) $person['id'] ?>"><?= htmlspecialchars($person['name']) ?></a>
+            <p>
+                <a href="person-bearbeiten.php?id=<?= (int) $person['id'] ?>"><?= htmlspecialchars($person['name']) ?></a>
+                (Geburtstag: <?= htmlspecialchars($person['geburtsdatum']) ?>, <?= Person::alter($person) ?> Jahre)
+            </p>
         <?php endforeach; ?>
     <?php endif; ?>
 

@@ -3,13 +3,13 @@ require_once __DIR__ . '/../backend/models/Person.php';
 
 $fehler = [];
 $name = '';
-$alter = '';
+$geburtsdatum = '';
 $geschlecht = '';
 $details = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
-    $alter = trim($_POST['alter'] ?? '');
+    $geburtsdatum = trim($_POST['geburtsdatum'] ?? '');
     $geschlecht = $_POST['geschlecht'] ?? '';
     $details = trim($_POST['details'] ?? '');
 
@@ -19,8 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fehler[] = 'Der Name darf nur Buchstaben, Leerzeichen, Bindestriche und Apostrophe enthalten.';
     }
 
-    if (!Person::istGueltigesAlter($alter)) {
-        $fehler[] = 'Bitte ein gültiges Alter zwischen 0 und 120 angeben.';
+    if ($geburtsdatum === '') {
+        $fehler[] = 'Bitte ein Geburtsdatum angeben.';
+    } elseif (!Person::istGueltigesGeburtsdatum($geburtsdatum)) {
+        $fehler[] = 'Bitte ein gültiges Geburtsdatum angeben (nicht in der Zukunft).';
     }
 
     if (!Person::istGueltigesGeschlecht($geschlecht)) {
@@ -34,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($fehler)) {
         Person::erstellen(
             $name,
-            $alter !== '' ? (int) $alter : null,
+            $geburtsdatum,
             $geschlecht !== '' ? $geschlecht : null,
             $details !== '' ? $details : null
         );
@@ -69,8 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label for="name">Name:</label>
         <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" maxlength="100" required>
 
-        <label for="alter">Alter:</label>
-        <input type="number" id="alter" name="alter" value="<?= htmlspecialchars($alter) ?>" min="0" max="120">
+        <label for="geburtsdatum">Geburtsdatum:</label>
+        <input type="date" id="geburtsdatum" name="geburtsdatum" value="<?= htmlspecialchars($geburtsdatum) ?>" required>
 
         <label for="geschlecht">Geschlecht:</label>
         <select id="geschlecht" name="geschlecht">

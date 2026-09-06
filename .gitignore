@@ -27,9 +27,12 @@ Desktop.ini
 # Claude Code
 .claude/
 
-# Persönliche Projektdokumente (Aufgabenstellung, Meilensteine)
+# Persönliche Projektdokumente (Projektvorgaben, Meilensteine)
 my_docs/
 
 # Laufende MS4-Dokumentation (docs/) vorerst lokal, bis das Team sich auf eine
 # gemeinsame Doku-Struktur/Konvention geeinigt hat. Danach wieder entfernen.
 docs/
+
+# Screenshots für die Kommunikation mit Claude, nicht für das Repository bestimmt
+anpassen/

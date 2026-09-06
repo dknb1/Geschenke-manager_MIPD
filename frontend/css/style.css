@@ -253,14 +253,30 @@ button:hover {
     gap: 0.6rem;
 }
 
+/* Der Eintrag selbst (idee-bearbeiten.php-Link) traegt die Kachel-Optik ueber die globale
+   a-Regel oben - li bekommt bewusst keine eigene Box (kein border/padding), sonst entsteht
+   eine "Box in der Box". */
 .ideen-liste li {
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 0.6rem 0.9rem;
+    display: block;
+}
+
+/* Externe Link/Bild-Verweise duerfen NICHT im idee-bearbeiten.php-Link verschachtelt sein
+   (ungueltiges HTML), sollen aber auch keine eigene grosse Kachel wie die globale a-Regel
+   bekommen - deshalb eigene schlanke Zeile mit eigener Klasse statt ungeprueftem <a>, siehe
+   project_data_structures-Hinweis zu inline-Links im Fliesstext. */
+.ideen-liste-extras {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: baseline;
+    gap: 0.8rem;
+    margin: 0.2rem 0 0.6rem;
+}
+
+.ideen-liste-extras a {
+    display: inline;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    text-decoration: underline;
 }
 
 .fenster-buttons {

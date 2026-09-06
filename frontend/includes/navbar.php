@@ -7,43 +7,53 @@ require_once __DIR__ . '/../../backend/models/Einstellung.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
     && isset($_POST['benachrichtigung_tage'])) {
 
-    $neueTage = filter_input(
+    $navNeueTage = filter_input(
         INPUT_POST,
         'benachrichtigung_tage',
         FILTER_VALIDATE_INT
     );
 
-    if ($neueTage !== false && $neueTage >= 0 && $neueTage <= 365) {
-        Einstellung::benachrichtigungTageSpeichern($neueTage);
+    if ($navNeueTage !== false && $navNeueTage >= 0 && $navNeueTage <= 365) {
+        Einstellung::benachrichtigungTageSpeichern($navNeueTage);
     }
 }
 
 // Aktuell gespeicherte Einstellung laden
-$benachrichtigungTage = Einstellung::benachrichtigungTage();
+$navBenachrichtigungTage = Einstellung::benachrichtigungTage();
 
-$anlaesse = Anlass::alle();
-$benachrichtigungen = [];
+// Alle Variablen hier bewusst mit "nav"-Praefix: navbar.php wird per include() eingebunden
+// und teilt sich dadurch den Variablen-Scope mit der jeweils einbindenden Seite - ohne
+// Praefix wuerden generische Namen wie $anlaesse/$anlass/$heute die gleichnamigen Variablen
+// der einbindenden Seite ueberschreiben (siehe z. B. anlaesse.php, das selbst $anlaesse/
+// $anlass fuer seine eigene Liste verwendet).
+$navAnlaesse = Anlass::alle();
+$navBenachrichtigungen = [];
 
-$heute = new DateTimeImmutable('today');
+$navHeute = new DateTimeImmutable('today');
 
-foreach ($anlaesse as $anlass) {
+foreach ($navAnlaesse as $navAnlass) {
 
-    $naechstesDatum = Anlass::naechstesVorkommen($anlass);
+    $navNaechstesDatum = Anlass::naechstesVorkommen($navAnlass);
 
-    $tage = (int) $heute->diff($naechstesDatum)->format('%r%a');
+    $navTage = (int) $navHeute->diff($navNaechstesDatum)->format('%r%a');
 
-    if ($tage >= 0 && $tage <= $benachrichtigungTage) {
+    if ($navTage >= 0 && $navTage <= $navBenachrichtigungTage) {
 
-        $benachrichtigungen[] = [
-            'name' => $anlass['name'],
-            'person' => $anlass['person_name'] ?? null,
-            'tage' => $tage,
-            'datum' => $naechstesDatum
+        // anlaesse.person_name (freier Text) gibt es nicht mehr - Personen sind jetzt per
+        // N:M (anlass_personen) verknuepft, ein Anlass kann also auch mehreren Personen
+        // gehoeren (siehe Anlass::personen()).
+        $navPersonenNamen = array_column(Anlass::personen((int) $navAnlass['id']), 'name');
+
+        $navBenachrichtigungen[] = [
+            'name' => $navAnlass['name'],
+            'person' => !empty($navPersonenNamen) ? implode(', ', $navPersonenNamen) : null,
+            'tage' => $navTage,
+            'datum' => $navNaechstesDatum
         ];
     }
 }
 
-usort($benachrichtigungen, function ($a, $b) {
+usort($navBenachrichtigungen, function ($a, $b) {
     return $a['datum'] <=> $b['datum'];
 });
 
@@ -64,9 +74,9 @@ usort($benachrichtigungen, function ($a, $b) {
 
     🔔
 
-    <?php if (count($benachrichtigungen) > 0): ?>
+    <?php if (count($navBenachrichtigungen) > 0): ?>
         <span class="benachrichtigungs-anzahl">
-            <?= count($benachrichtigungen) ?>
+            <?= count($navBenachrichtigungen) ?>
         </span>
     <?php endif; ?>
 
@@ -108,37 +118,37 @@ usort($benachrichtigungen, function ($a, $b) {
     </div>
 
 
-    <?php if (empty($benachrichtigungen)): ?>
+    <?php if (empty($navBenachrichtigungen)): ?>
 
         <p>Keine anstehenden Anlässe.</p>
 
     <?php else: ?>
 
-        <?php foreach ($benachrichtigungen as $benachrichtigung): ?>
+        <?php foreach ($navBenachrichtigungen as $navBenachrichtigung): ?>
 
             <p>
 
-                <?php if ($benachrichtigung['tage'] === 0): ?>
+                <?php if ($navBenachrichtigung['tage'] === 0): ?>
 
                     Heute ist
-                    <?= htmlspecialchars($benachrichtigung['name']) ?>
+                    <?= htmlspecialchars($navBenachrichtigung['name']) ?>
 
-                <?php elseif ($benachrichtigung['tage'] === 1): ?>
+                <?php elseif ($navBenachrichtigung['tage'] === 1): ?>
 
                     Morgen ist
-                    <?= htmlspecialchars($benachrichtigung['name']) ?>
+                    <?= htmlspecialchars($navBenachrichtigung['name']) ?>
 
                 <?php else: ?>
 
-                    In <?= $benachrichtigung['tage'] ?> Tagen ist
-                    <?= htmlspecialchars($benachrichtigung['name']) ?>
+                    In <?= $navBenachrichtigung['tage'] ?> Tagen ist
+                    <?= htmlspecialchars($navBenachrichtigung['name']) ?>
 
                 <?php endif; ?>
 
-                <?php if (!empty($benachrichtigung['person'])): ?>
+                <?php if (!empty($navBenachrichtigung['person'])): ?>
 
                     von
-                    <?= htmlspecialchars($benachrichtigung['person']) ?>
+                    <?= htmlspecialchars($navBenachrichtigung['person']) ?>
 
                 <?php endif; ?>.
 
@@ -177,27 +187,27 @@ usort($benachrichtigungen, function ($a, $b) {
                 name="benachrichtigung_tage">
 
             <option value="1"
-                <?= $benachrichtigungTage === 1 ? 'selected' : '' ?>>
+                <?= $navBenachrichtigungTage === 1 ? 'selected' : '' ?>>
                 1 Tag
             </option>
 
             <option value="3"
-                <?= $benachrichtigungTage === 3 ? 'selected' : '' ?>>
+                <?= $navBenachrichtigungTage === 3 ? 'selected' : '' ?>>
                 3 Tage
             </option>
 
             <option value="7"
-                <?= $benachrichtigungTage === 7 ? 'selected' : '' ?>>
+                <?= $navBenachrichtigungTage === 7 ? 'selected' : '' ?>>
                 7 Tage
             </option>
 
             <option value="14"
-                <?= $benachrichtigungTage === 14 ? 'selected' : '' ?>>
+                <?= $navBenachrichtigungTage === 14 ? 'selected' : '' ?>>
                 14 Tage
             </option>
 
             <option value="30"
-                <?= $benachrichtigungTage === 30 ? 'selected' : '' ?>>
+                <?= $navBenachrichtigungTage === 30 ? 'selected' : '' ?>>
                 30 Tage
             </option>
 

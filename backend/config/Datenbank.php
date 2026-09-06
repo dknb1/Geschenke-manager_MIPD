@@ -4,6 +4,24 @@ class Datenbank
 {
     private static ?PDO $verbindung = null;
 
+    /**
+     * Spalten, die im Laufe des Projekts NACH der ersten Version einer Tabelle ergaenzt
+     * wurden. "CREATE TABLE IF NOT EXISTS" (siehe schema.sql) legt eine Tabelle nur an, wenn
+     * sie noch nicht existiert - es traegt bei einer bereits bestehenden Tabelle keine neuen
+     * Spalten nach. Bisher musste dafuer die komplette lokale Datenbankdatei geloescht werden,
+     * was jedes Mal alle echten Daten vernichtet hat. Stattdessen: fehlende Spalten hier
+     * eintragen, migriereFehlendeSpalten() unten ergaenzt sie per ALTER TABLE ADD COLUMN nach
+     * (bestehende Zeilen bleiben erhalten, neue Spalte wird mit ihrem DEFAULT-Wert befuellt).
+     */
+    private const NACHTRAEGLICHE_SPALTEN = [
+        'geschenkideen' => [
+            'fuer_geburtstag' => 'INTEGER NOT NULL DEFAULT 0',
+            'geschenk_anlass_id' => 'INTEGER REFERENCES anlaesse(id) ON DELETE SET NULL',
+            'geschenk_fuer_geburtstag' => 'INTEGER NOT NULL DEFAULT 0',
+            'geschenk_datum' => 'TEXT',
+        ],
+    ];
+
     public static function verbinden(): PDO
     {
         if (self::$verbindung === null) {
@@ -28,10 +46,33 @@ class Datenbank
     {
         $verbindung = new PDO('sqlite:' . $pfad);
         $verbindung->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // Ohne dieses Pragma ignoriert SQLite REFERENCES/ON DELETE CASCADE stillschweigend
+        // (Fremdschluessel werden pro Verbindung, nicht global, aktiviert).
+        $verbindung->exec('PRAGMA foreign_keys = ON');
         $verbindung->exec(file_get_contents(__DIR__ . '/../../datenbank/schema.sql'));
+        self::migriereFehlendeSpalten($verbindung);
         self::seedStandardanlaesse($verbindung);
 
         return $verbindung;
+    }
+
+    /**
+     * Ergaenzt Spalten aus NACHTRAEGLICHE_SPALTEN, falls sie an einer bereits bestehenden
+     * Tabelle noch fehlen (z. B. lokale Datenbankdatei von vor der jeweiligen Spalten-
+     * Einfuehrung) - ohne bestehende Zeilen/Daten anzutasten. Bei einer frisch von schema.sql
+     * angelegten Tabelle sind alle Spalten ohnehin schon vorhanden, hier passiert dann nichts.
+     */
+    private static function migriereFehlendeSpalten(PDO $verbindung): void
+    {
+        foreach (self::NACHTRAEGLICHE_SPALTEN as $tabelle => $spalten) {
+            $vorhandeneSpalten = array_column($verbindung->query("PRAGMA table_info($tabelle)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+
+            foreach ($spalten as $spalte => $definition) {
+                if (!in_array($spalte, $vorhandeneSpalten, true)) {
+                    $verbindung->exec("ALTER TABLE $tabelle ADD COLUMN $spalte $definition");
+                }
+            }
+        }
     }
 
     /**

@@ -1,17 +1,22 @@
 <?php
 require_once __DIR__ . '/../backend/models/Anlass.php';
+require_once __DIR__ . '/../backend/models/Person.php';
 
 $fehler = [];
 $name = '';
 $datum = '';
 $wiederholung = '';
-$person = '';
+$personIds = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $datum = trim($_POST['datum'] ?? '');
     $wiederholung = $_POST['wiederholung'] ?? '';
-    $person = trim($_POST['person'] ?? '');
+    $gueltigePersonIds = array_column(Person::alle(), 'id');
+    $personIds = array_values(array_intersect(
+        array_map('intval', $_POST['person_ids'] ?? []),
+        $gueltigePersonIds
+    ));
 
     if ($name === '') {
         $fehler[] = 'Bitte einen Namen für den Anlass angeben.';
@@ -24,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($fehler)) {
-        Anlass::erstellen($name, $datum, $wiederholung === 'ja', $person !== '' ? $person : null);
+        Anlass::erstellen($name, $datum, $wiederholung === 'ja', $personIds);
         header('Location: anlaesse.php');
         exit;
     }
@@ -70,8 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Nein
         </label>
 
-        <label for="person">Person (optional):</label>
-        <input type="text" id="person" name="person" value="<?= htmlspecialchars($person) ?>">
+        <label for="person_ids">Personen (optional, Mehrfachauswahl möglich):</label>
+        <select id="person_ids" name="person_ids[]" multiple size="8">
+            <?php foreach (Person::alle() as $p): ?>
+                <option value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $personIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
 
         <button type="submit">Anlass erstellen</button>
 
