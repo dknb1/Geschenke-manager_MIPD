@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Einstellung.php';
+require_once __DIR__ . '/../../backend/models/Person.php';
 
 // Neue Einstellung speichern
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
@@ -26,7 +27,20 @@ $navBenachrichtigungTage = Einstellung::benachrichtigungTage();
 // Praefix wuerden generische Namen wie $anlaesse/$anlass/$heute die gleichnamigen Variablen
 // der einbindenden Seite ueberschreiben (siehe z. B. anlaesse.php, das selbst $anlaesse/
 // $anlass fuer seine eigene Liste verwendet).
-$navAnlaesse = Anlass::alle();
+// Geburtstage sind fachlich Anlaesse, stehen aber bewusst nicht als eigene Zeile in
+// anlaesse (siehe Person::geburtstagAlsAnlass()) - deshalb hier genau wie in anlaesse.php
+// zusaetzlich reinberechnet. Ohne das wuerden Geburtstage nie als Benachrichtigung
+// auftauchen, obwohl das laut Aufgabenstellung ausdruecklich gefordert ist
+// ("Benachrichtigung ueber Geburtstage im naechsten Monat").
+$navAnlaesse = array_map(
+    static fn (array $a): array => $a + ['ist_geburtstag' => false],
+    Anlass::alle()
+);
+$navGeburtstage = array_map(
+    static fn (array $p): array => Person::geburtstagAlsAnlass($p),
+    Person::alle()
+);
+$navAnlaesse = array_merge($navAnlaesse, $navGeburtstage);
 $navBenachrichtigungen = [];
 
 $navHeute = new DateTimeImmutable('today');
@@ -41,12 +55,18 @@ foreach ($navAnlaesse as $navAnlass) {
 
         // anlaesse.person_name (freier Text) gibt es nicht mehr - Personen sind jetzt per
         // N:M (anlass_personen) verknuepft, ein Anlass kann also auch mehreren Personen
-        // gehoeren (siehe Anlass::personen()).
-        $navPersonenNamen = array_column(Anlass::personen((int) $navAnlass['id']), 'name');
+        // gehoeren (siehe Anlass::personen()). Bei Geburtstagen steckt der Personenname
+        // bereits im Anlassnamen ("Geburtstag Julia") - keine zusaetzliche Personen-Zeile
+        // noetig, sonst wuerde "von Julia" redundant nochmal angehaengt.
+        $navPersonName = null;
+        if (!$navAnlass['ist_geburtstag']) {
+            $navPersonenNamen = array_column(Anlass::personen((int) $navAnlass['id']), 'name');
+            $navPersonName = !empty($navPersonenNamen) ? implode(', ', $navPersonenNamen) : null;
+        }
 
         $navBenachrichtigungen[] = [
             'name' => $navAnlass['name'],
-            'person' => !empty($navPersonenNamen) ? implode(', ', $navPersonenNamen) : null,
+            'person' => $navPersonName,
             'tage' => $navTage,
             'datum' => $navNaechstesDatum
         ];
