@@ -30,22 +30,9 @@ usort(
 );
 
 $geschenkideenDieserPerson = Geschenkidee::vonPerson($id);
-
-$aktuelleGeschenkideen = [];
-$vergangeneGeschenke = [];
-$heute = new DateTimeImmutable('today');
-
-foreach ($geschenkideenDieserPerson as $idee) {
-    $istVergangen = Geschenkidee::istFest($idee)
-        && !empty($idee['geschenk_datum'])
-        && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
-
-    if ($istVergangen) {
-        $vergangeneGeschenke[] = $idee;
-    } else {
-        $aktuelleGeschenkideen[] = $idee;
-    }
-}
+$geschenkideenSortiert = Geschenkidee::sortiereAktuellUndVergangen($geschenkideenDieserPerson);
+$aktuelleGeschenkideen = $geschenkideenSortiert['aktuell'];
+$vergangeneGeschenke = $geschenkideenSortiert['vergangen'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aktion = $_POST['aktion'] ?? 'speichern';

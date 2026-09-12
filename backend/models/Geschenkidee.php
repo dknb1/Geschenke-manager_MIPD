@@ -274,6 +274,62 @@ public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bo
 }
 
     /**
+     * Trennt die Ideen einer Person in "aktuell" (noch offen oder fest fuer einen kommenden
+     * Termin) und "vergangen" (fest zugeordnet mit bereits verstrichenem geschenk_datum) -
+     * zentrale Stelle statt dieselbe Schleife in person-bearbeiten.php und gesamtliste.php
+     * dupliziert zu pflegen.
+     *
+     * @param array[] $ideen z. B. das Ergebnis von vonPerson()
+     * @return array{aktuell: array[], vergangen: array[]}
+     */
+    public static function sortiereAktuellUndVergangen(array $ideen, ?DateTimeImmutable $heute = null): array
+    {
+        $heute ??= new DateTimeImmutable('today');
+        $aktuell = [];
+        $vergangen = [];
+
+        foreach ($ideen as $idee) {
+            $istVergangen = self::istFest($idee)
+                && !empty($idee['geschenk_datum'])
+                && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
+
+            if ($istVergangen) {
+                $vergangen[] = $idee;
+            } else {
+                $aktuell[] = $idee;
+            }
+        }
+
+        return ['aktuell' => $aktuell, 'vergangen' => $vergangen];
+    }
+
+    /**
+     * Bereits bekannte Geschenkideen fuer den (kommenden) Geburtstag einer Person - fuer die
+     * monatliche Geburtstags-Vorschau in der Benachrichtigungsglocke (siehe navbar.php).
+     * Zaehlt sowohl lose "auch fuer den Geburtstag gedacht"-markierte Ideen (fuer_geburtstag)
+     * als auch fest fuer den Geburtstag zugeordnete, deren Termin noch nicht vergangen ist -
+     * ein bereits gefeierter Geburtstag soll hier nicht mehr als "bekannte Idee" fuer den
+     * naechsten auftauchen.
+     */
+    public static function bekannteIdeenFuerGeburtstag(int $personId, ?DateTimeImmutable $heute = null): array
+    {
+        $heute ??= new DateTimeImmutable('today');
+
+        return array_values(array_filter(
+            self::vonPerson($personId),
+            function (array $idee) use ($heute) {
+                if (self::istFest($idee)) {
+                    return (int) $idee['geschenk_fuer_geburtstag'] === 1
+                        && !empty($idee['geschenk_datum'])
+                        && new DateTimeImmutable($idee['geschenk_datum']) >= $heute;
+                }
+
+                return (int) $idee['fuer_geburtstag'] === 1;
+            }
+        ));
+    }
+
+    /**
      * Macht eine feste Geschenk-Zuordnung rueckgaengig - die Idee gilt danach wieder als
      * "offen". Die losen Anlass-Tags (anlaesse()/fuer_geburtstag) werden davon nicht
      * beruehrt, da sie waehrend der Fest-Zuordnung nicht veraendert wurden (siehe

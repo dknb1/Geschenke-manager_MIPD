@@ -424,4 +424,67 @@ final class GeschenkideeTest extends ModelTestCase
 
         $this->assertContains('Bitte einen gültigen Link angeben (z. B. https://...).', $fehler);
     }
+
+    public function testSortiereAktuellUndVergangenTrenntNachGeschenkDatum(): void
+    {
+        $heute = new DateTimeImmutable('2026-09-12');
+        $personId = $this->testPersonAnlegen('Max');
+
+        Anlass::erstellen('Vergangene Feier', '2020-01-01', false, []);
+        $vergangenerAnlassId = (int) $this->findeAnlassNachName('Vergangene Feier')['id'];
+
+        Geschenkidee::erstellen($personId, 'Noch offen', null, null);
+        Geschenkidee::erstellen($personId, 'Bereits verschenkt', null, null);
+        $offeneId = (int) $this->findeIdeeNachText('Noch offen')['id'];
+        $verschenkteId = (int) $this->findeIdeeNachText('Bereits verschenkt')['id'];
+
+        // festMachen() wuerde einen bereits vergangenen Anlass ueber istGueltigerZielAnlass()
+        // normalerweise ablehnen - hier direkt aufgerufen, um gezielt einen "vergangenen"
+        // Datensatz zu erzeugen (analog zu testAnlassNamenInklGeburtstagZeigtVergangenBeiFestemVergangenemDatum()).
+        Geschenkidee::festMachen($verschenkteId, $vergangenerAnlassId);
+
+        $sortiert = Geschenkidee::sortiereAktuellUndVergangen(Geschenkidee::vonPerson($personId), $heute);
+
+        $this->assertCount(1, $sortiert['aktuell']);
+        $this->assertSame($offeneId, (int) $sortiert['aktuell'][0]['id']);
+        $this->assertCount(1, $sortiert['vergangen']);
+        $this->assertSame($verschenkteId, (int) $sortiert['vergangen'][0]['id']);
+    }
+
+    public function testBekannteIdeenFuerGeburtstagEnthaeltLoseMarkierteUndNichtVergangeneFesteIdeen(): void
+    {
+        $heute = new DateTimeImmutable('2026-09-12');
+        Person::erstellen('Anna', '1990-10-05', null, null);
+        $personId = (int) $this->findePersonNachName('Anna')['id'];
+
+        Geschenkidee::erstellen($personId, 'Lose fuer Geburtstag', null, null, [], true);
+        Geschenkidee::erstellen($personId, 'Nicht fuer Geburtstag', null, null, [], false);
+        Geschenkidee::erstellen($personId, 'Fest fuer kommenden Geburtstag', null, null);
+        $festeId = (int) $this->findeIdeeNachText('Fest fuer kommenden Geburtstag')['id'];
+        Geschenkidee::festMachenFuerGeburtstag($festeId);
+
+        $bekannt = array_column(Geschenkidee::bekannteIdeenFuerGeburtstag($personId, $heute), 'text');
+
+        $this->assertContains('Lose fuer Geburtstag', $bekannt);
+        $this->assertContains('Fest fuer kommenden Geburtstag', $bekannt);
+        $this->assertNotContains('Nicht fuer Geburtstag', $bekannt);
+    }
+
+    public function testBekannteIdeenFuerGeburtstagBlendetBereitsVergangeneFesteIdeenAus(): void
+    {
+        Person::erstellen('Max', '1990-06-15', null, null);
+        $personId = (int) $this->findePersonNachName('Max')['id'];
+
+        Geschenkidee::erstellen($personId, 'Letztes Jahr verschenkt', null, null);
+        $id = (int) $this->findeIdeeNachText('Letztes Jahr verschenkt')['id'];
+        Geschenkidee::festMachenFuerGeburtstag($id);
+
+        // Ein Jahr nach dem eingefrorenen Geschenkdatum: der (letzte) Geburtstag liegt jetzt in
+        // der Vergangenheit und soll nicht mehr als "bekannte Idee" fuer den naechsten auftauchen.
+        $einJahrSpaeter = (new DateTimeImmutable(Geschenkidee::finden($id)['geschenk_datum']))->modify('+1 year');
+
+        $bekannt = Geschenkidee::bekannteIdeenFuerGeburtstag($personId, $einJahrSpaeter);
+
+        $this->assertSame([], $bekannt);
+    }
 }

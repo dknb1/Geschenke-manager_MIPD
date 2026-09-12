@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Einstellung.php';
 require_once __DIR__ . '/../../backend/models/Geschenkidee.php';
+require_once __DIR__ . '/../../backend/models/Person.php';
 
 // Neue Einstellung speichern
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
@@ -145,9 +146,33 @@ if ($navWeihnachten !== null) {
     }
 }
 
+// Geburtstage im naechsten Monat inkl. bereits bekannter Geschenkideen (unabhaengig von der
+// einstellbaren "Tage vorher"-Erinnerung oben, siehe Anlass::personenMitGeburtstagImNaechstenMonat())
+$navGeburtstagsVorschau = [];
+
+foreach (Anlass::personenMitGeburtstagImNaechstenMonat($navHeute) as $navPerson) {
+    $navGeburtstagsIdeen = array_map(
+        function (array $navIdee) {
+            return !empty($navIdee['text']) ? $navIdee['text'] : 'Idee ohne Textbeschreibung';
+        },
+        Geschenkidee::bekannteIdeenFuerGeburtstag((int) $navPerson['id'], $navHeute)
+    );
+
+    $navGeburtstagsVorschau[] = [
+        'person' => $navPerson['name'],
+        'datum' => Anlass::naechstesVorkommen(Person::geburtstagAlsAnlass($navPerson), $navHeute),
+        'ideen' => $navGeburtstagsIdeen,
+    ];
+}
+
+usort($navGeburtstagsVorschau, function ($a, $b) {
+    return $a['datum'] <=> $b['datum'];
+});
+
 $navBenachrichtigungsAnzahl =
     count($navBenachrichtigungen)
-    + (!empty($navWeihnachtsStatus) ? 1 : 0);
+    + (!empty($navWeihnachtsStatus) ? 1 : 0)
+    + count($navGeburtstagsVorschau);
 
 ?>
 
@@ -205,7 +230,7 @@ $navBenachrichtigungsAnzahl =
 
     </div>
 
-    <?php if (empty($navBenachrichtigungen) && empty($navWeihnachtsStatus)): ?>
+    <?php if (empty($navBenachrichtigungen) && empty($navWeihnachtsStatus) && empty($navGeburtstagsVorschau)): ?>
 
         <p>Keine anstehenden Benachrichtigungen.</p>
 
@@ -260,6 +285,29 @@ $navBenachrichtigungsAnzahl =
 
     Status: <strong><?= $navStatusText ?></strong>
 </p>
+
+            <?php endforeach; ?>
+
+        <?php endif; ?>
+
+        <?php if (!empty($navGeburtstagsVorschau)): ?>
+
+            <h3>Geburtstage im nächsten Monat</h3>
+
+            <?php foreach ($navGeburtstagsVorschau as $navVorschau): ?>
+
+                <p>
+                    <strong><?= htmlspecialchars($navVorschau['person']) ?>:</strong>
+                    <?= htmlspecialchars($navVorschau['datum']->format('d.m.Y')) ?>
+                    <br>
+
+                    <?php if (!empty($navVorschau['ideen'])): ?>
+                        Bereits bekannte Geschenkideen:
+                        <?= htmlspecialchars(implode(', ', $navVorschau['ideen'])) ?>
+                    <?php else: ?>
+                        Noch keine Geschenkidee bekannt.
+                    <?php endif; ?>
+                </p>
 
             <?php endforeach; ?>
 

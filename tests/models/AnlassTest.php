@@ -260,4 +260,33 @@ final class AnlassTest extends ModelTestCase
         $this->assertTrue($geburtstag['ist_geburtstag']);
         $this->assertFalse($weihnachten['ist_geburtstag']);
     }
+
+    public function testPersonenMitGeburtstagImNaechstenMonatFiltertNachMonat(): void
+    {
+        $heute = new DateTimeImmutable('2026-09-12');
+
+        // Geburtstag faellt (dieses Jahr betrachtet) in den naechsten Kalendermonat (Oktober).
+        Person::erstellen('Im Oktober', '1990-10-05', null, null);
+        // Geburtstag liegt noch im aktuellen Monat (September) - zaehlt NICHT als "naechster Monat".
+        Person::erstellen('Noch im September', '1990-09-20', null, null);
+        // Geburtstag liegt erst in zwei Monaten (November) - ebenfalls nicht "naechster Monat".
+        Person::erstellen('Im November', '1990-11-01', null, null);
+
+        $namen = array_column(Anlass::personenMitGeburtstagImNaechstenMonat($heute), 'name');
+
+        $this->assertSame(['Im Oktober'], $namen);
+    }
+
+    public function testPersonenMitGeburtstagImNaechstenMonatBeruecksichtigtJahreswechsel(): void
+    {
+        // Heute im Dezember: "naechster Monat" ist Januar des Folgejahres.
+        $heute = new DateTimeImmutable('2026-12-15');
+
+        Person::erstellen('Im Januar', '1990-01-10', null, null);
+        Person::erstellen('Im Dezember', '1990-12-24', null, null);
+
+        $namen = array_column(Anlass::personenMitGeburtstagImNaechstenMonat($heute), 'name');
+
+        $this->assertSame(['Im Januar'], $namen);
+    }
 }

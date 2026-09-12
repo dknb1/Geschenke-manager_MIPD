@@ -36,6 +36,10 @@
 
 <a href="idee-speichern.php">Idee speichern</a>
 
+    <h2>Übersicht</h2>
+
+<a href="gesamtliste.php">Gesamtliste anzeigen</a>
+
 </div>
 
 </body>

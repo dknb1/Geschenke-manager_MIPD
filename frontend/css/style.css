@@ -342,3 +342,23 @@ button:hover {
     border-radius: 7px;
     box-sizing: border-box;
 }
+/* Gesamtliste (frontend/gesamtliste.php): druckbare Uebersicht aller Personen. Trennlinie
+   zwischen Personen-Abschnitten fuer bessere Lesbarkeit bei vielen Personen; der
+   "Drucken"-Button sowie die Navbar werden beim tatsaechlichen Drucken ausgeblendet, damit
+   nur die eigentliche Liste auf dem Papier landet. */
+.gesamtliste-person {
+    border-top: 1px solid #ddd;
+    padding-top: 16px;
+    margin-top: 16px;
+}
+
+.gesamtliste-drucken {
+    margin-bottom: 16px;
+}
+
+@media print {
+    .navbar,
+    .gesamtliste-drucken {
+        display: none;
+    }
+}

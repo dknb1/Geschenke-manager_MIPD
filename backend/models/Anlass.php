@@ -50,6 +50,27 @@ class Anlass
     }
 
     /**
+     * Alle Personen, deren naechster Geburtstag in den naechsten Kalendermonat faellt (z. B.
+     * heute im September -> Geburtstage im Oktober, unabhaengig von der einstellbaren
+     * "Tage vorher"-Erinnerung) - fuer die monatliche Geburtstags-Vorschau in der
+     * Benachrichtigungsglocke (siehe navbar.php). $heute ist fuer Tests injizierbar.
+     */
+    public static function personenMitGeburtstagImNaechstenMonat(?DateTimeImmutable $heute = null): array
+    {
+        $heute ??= new DateTimeImmutable('today');
+        $monatsanfang = $heute->modify('first day of next month')->setTime(0, 0, 0);
+        $monatsende = $monatsanfang->modify('last day of this month')->setTime(23, 59, 59);
+
+        return array_values(array_filter(
+            Person::alle(),
+            function (array $person) use ($heute, $monatsanfang, $monatsende) {
+                $geburtstag = self::naechstesVorkommen(Person::geburtstagAlsAnlass($person), $heute);
+                return $geburtstag >= $monatsanfang && $geburtstag <= $monatsende;
+            }
+        ));
+    }
+
+    /**
      * Buendelt die Validierung von Name und Datum eines Anlasses fuer erstellen()/
      * aktualisieren() in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) -
      * zentrale Stelle statt dieselbe Pruefung in anlass-erstellen.php und
