@@ -22,12 +22,30 @@ $name = $person['name'];
 $geburtsdatum = $person['geburtsdatum'];
 $geschlecht = $person['geschlecht'] ?? '';
 $details = $person['details'] ?? '';
+
 $verknuepfteAnlaesse = array_merge(Anlass::geschuetzte(), Anlass::vonPerson($id));
 usort(
     $verknuepfteAnlaesse,
     fn (array $a, array $b) => Anlass::naechstesVorkommen($a) <=> Anlass::naechstesVorkommen($b)
 );
+
 $geschenkideenDieserPerson = Geschenkidee::vonPerson($id);
+
+$aktuelleGeschenkideen = [];
+$vergangeneGeschenke = [];
+$heute = new DateTimeImmutable('today');
+
+foreach ($geschenkideenDieserPerson as $idee) {
+    $istVergangen = Geschenkidee::istFest($idee)
+        && !empty($idee['geschenk_datum'])
+        && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
+
+    if ($istVergangen) {
+        $vergangeneGeschenke[] = $idee;
+    } else {
+        $aktuelleGeschenkideen[] = $idee;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aktion = $_POST['aktion'] ?? 'speichern';
@@ -71,7 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
- <?php include 'includes/navbar.php'; ?>
+
+    <?php include 'includes/navbar.php'; ?>
 
     <h1>Person verwalten</h1>
 
@@ -101,36 +120,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <textarea id="details" name="details" rows="5" maxlength="1000"><?= htmlspecialchars($details) ?></textarea>
 
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
-
         <button type="submit" name="aktion" value="loeschen">Person löschen</button>
 
     </form>
-
     <h2>Anlässe von <?= htmlspecialchars($name) ?></h2>
-
     <?php $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person); ?>
     <p>
-        <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> - <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
+        <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> -
+        <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
         <strong>(Geburtstag)</strong>
     </p>
-
     <?php if (empty($verknuepfteAnlaesse)): ?>
         <p>Keine weiteren Anlässe hinterlegt.</p>
     <?php else: ?>
         <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
             <a href="anlass-bearbeiten.php?id=<?= (int) $verknuepfterAnlass['id'] ?>">
-                <?= htmlspecialchars($verknuepfterAnlass['name']) ?> - <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?><?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?> <strong>(Pflichtanlass)</strong><?php endif; ?>
+                <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
+                <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
+                <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
+                    <strong>(Pflichtanlass)</strong>
+                <?php endif; ?>
             </a>
         <?php endforeach; ?>
     <?php endif; ?>
+    <h2>Aktuelle Geschenkideen für <?= htmlspecialchars($name) ?></h2>
 
-    <h2>Geschenkideen für <?= htmlspecialchars($name) ?></h2>
-
-    <?php if (empty($geschenkideenDieserPerson)): ?>
-        <p>Keine Geschenkideen hinterlegt.</p>
+    <?php if (empty($aktuelleGeschenkideen)): ?>
+        <p>Keine aktuellen Geschenkideen hinterlegt.</p>
     <?php else: ?>
         <ul class="ideen-liste">
-            <?php foreach ($geschenkideenDieserPerson as $idee): ?>
+            <?php foreach ($aktuelleGeschenkideen as $idee): ?>
                 <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
                     <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
@@ -141,15 +160,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
                         <?php endif; ?>
                     </a>
+                    <p>Besorgt: <strong><?= (int) ($idee['besorgt'] ?? 0) === 1 ? 'Ja' : 'Nein' ?></strong></p>
+                    <?php if (!empty($idee['offene_aufgaben'])): ?>
+                        <p>Offene Aufgaben: <?= htmlspecialchars($idee['offene_aufgaben']) ?></p>
+                    <?php endif; ?>
                     <?php if (!empty($idee['link']) || !empty($idee['bild_link'])): ?>
                         <div class="ideen-liste-extras">
                             <?php if (!empty($idee['link'])): ?>
                                 <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
                             <?php endif; ?>
+
                             <?php if (!empty($idee['bild_link'])): ?>
                                 <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
                             <?php endif; ?>
                         </div>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+    <h2>Vergangene Geschenke für <?= htmlspecialchars($name) ?></h2>
+    <?php if (empty($vergangeneGeschenke)): ?>
+        <p>Keine vergangenen Geschenke dokumentiert.</p>
+    <?php else: ?>
+        <ul class="ideen-liste">
+            <?php foreach ($vergangeneGeschenke as $idee): ?>
+                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
+                <li>
+                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
+                        <?php if (!empty($idee['text'])): ?>
+                            <?= htmlspecialchars($idee['text']) ?>
+                        <?php endif; ?>
+
+                        <?php if (!empty($anlassNamen)): ?>
+                            (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
+                        <?php endif; ?>
+                    </a>
+
+                    <?php if (!empty($idee['geschenk_datum'])): ?>
+                        <p>
+                            Geschenkt am:
+                            <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>
+                        </p>
                     <?php endif; ?>
                 </li>
             <?php endforeach; ?>

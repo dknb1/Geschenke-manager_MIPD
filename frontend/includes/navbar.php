@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Einstellung.php';
+require_once __DIR__ . '/../../backend/models/Geschenkidee.php';
 
 // Neue Einstellung speichern
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
@@ -21,38 +22,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 // Aktuell gespeicherte Einstellung laden
 $navBenachrichtigungTage = Einstellung::benachrichtigungTage();
 
-// Alle Variablen hier bewusst mit "nav"-Praefix: navbar.php wird per include() eingebunden
-// und teilt sich dadurch den Variablen-Scope mit der jeweils einbindenden Seite - ohne
-// Praefix wuerden generische Namen wie $anlaesse/$anlass/$heute die gleichnamigen Variablen
-// der einbindenden Seite ueberschreiben (siehe z. B. anlaesse.php, das selbst $anlaesse/
-// $anlass fuer seine eigene Liste verwendet).
-// Geburtstage sind fachlich Anlaesse, stehen aber bewusst nicht als eigene Zeile in
-// anlaesse (siehe Person::geburtstagAlsAnlass()) - Anlass::alleInklGeburtstage() blendet sie
-// genau wie in anlaesse.php zusaetzlich ein. Ohne das wuerden Geburtstage nie als
-// Benachrichtigung auftauchen, obwohl das fachlich ausdruecklich gefordert ist
-// ("Benachrichtigung ueber Geburtstage im naechsten Monat").
+// Normale Anlass-Benachrichtigungen
 $navAnlaesse = Anlass::alleInklGeburtstage();
 $navBenachrichtigungen = [];
-
 $navHeute = new DateTimeImmutable('today');
 
 foreach ($navAnlaesse as $navAnlass) {
-
     $navNaechstesDatum = Anlass::naechstesVorkommen($navAnlass);
-
     $navTage = (int) $navHeute->diff($navNaechstesDatum)->format('%r%a');
 
     if ($navTage >= 0 && $navTage <= $navBenachrichtigungTage) {
-
-        // anlaesse.person_name (freier Text) gibt es nicht mehr - Personen sind jetzt per
-        // N:M (anlass_personen) verknuepft, ein Anlass kann also auch mehreren Personen
-        // gehoeren (siehe Anlass::personen()). Bei Geburtstagen steckt der Personenname
-        // bereits im Anlassnamen ("Geburtstag Julia") - keine zusaetzliche Personen-Zeile
-        // noetig, sonst wuerde "von Julia" redundant nochmal angehaengt.
         $navPersonName = null;
+
         if (!$navAnlass['ist_geburtstag']) {
-            $navPersonenNamen = array_column(Anlass::personen((int) $navAnlass['id']), 'name');
-            $navPersonName = !empty($navPersonenNamen) ? implode(', ', $navPersonenNamen) : null;
+            $navPersonenNamen = array_column(
+                Anlass::personen((int) $navAnlass['id']),
+                'name'
+            );
+
+            $navPersonName = !empty($navPersonenNamen)
+                ? implode(', ', $navPersonenNamen)
+                : null;
         }
 
         $navBenachrichtigungen[] = [
@@ -68,8 +58,98 @@ usort($navBenachrichtigungen, function ($a, $b) {
     return $a['datum'] <=> $b['datum'];
 });
 
-?>
+// Weihnachtsstatus
+$navWeihnachtsStatus = [];
+$navWeihnachten = null;
 
+// Nur zum Testen auf true.
+// Nach erfolgreichem Test wieder auf false setzen.
+$navWeihnachtsTestmodus = false;
+
+foreach (Anlass::alle() as $navMoeglicherAnlass) {
+    if (strcasecmp(trim($navMoeglicherAnlass['name']), 'Weihnachten') === 0) {
+        $navWeihnachten = $navMoeglicherAnlass;
+        break;
+    }
+}
+
+if ($navWeihnachten !== null) {
+    $navWeihnachtenDatum = Anlass::naechstesVorkommen($navWeihnachten);
+    $navWeihnachtenTage = (int) $navHeute->diff($navWeihnachtenDatum)->format('%r%a');
+
+    if ($navWeihnachtsTestmodus
+        || ($navWeihnachtenTage >= 0
+            && $navWeihnachtenTage <= $navBenachrichtigungTage)) {
+
+        $navWeihnachtsStatusNachPerson = [];
+
+        foreach (Geschenkidee::alle() as $navIdee) {
+            $navIstFest = Geschenkidee::istFest($navIdee);
+
+            if ($navIstFest) {
+                $navIstFuerWeihnachten =
+                    (int) ($navIdee['geschenk_anlass_id'] ?? 0)
+                    === (int) $navWeihnachten['id'];
+            } else {
+                $navLoseAnlassIds = array_map(
+                    'intval',
+                    array_column(
+                        Geschenkidee::anlaesse((int) $navIdee['id']),
+                        'id'
+                    )
+                );
+
+                $navIstFuerWeihnachten = in_array(
+                    (int) $navWeihnachten['id'],
+                    $navLoseAnlassIds,
+                    true
+                );
+            }
+
+            if (!$navIstFuerWeihnachten) {
+                continue;
+            }
+
+            $navIstVergangen = $navIstFest
+                && !empty($navIdee['geschenk_datum'])
+                && new DateTimeImmutable($navIdee['geschenk_datum']) < $navHeute;
+
+            if ($navIstVergangen) {
+                continue;
+            }
+
+            $navPersonId = (int) $navIdee['person_id'];
+
+            if (!isset($navWeihnachtsStatusNachPerson[$navPersonId])) {
+                $navWeihnachtsStatusNachPerson[$navPersonId] = [
+                    'person' => $navIdee['person_name'],
+                    'ideen' => 0,
+                    'besorgt' => 0,
+                    'offene_aufgaben' => []
+                ];
+            }
+
+            $navWeihnachtsStatusNachPerson[$navPersonId]['ideen']++;
+
+            if ((int) ($navIdee['besorgt'] ?? 0) === 1) {
+                $navWeihnachtsStatusNachPerson[$navPersonId]['besorgt']++;
+            }
+
+            if (!empty($navIdee['offene_aufgaben'])) {
+                $navWeihnachtsStatusNachPerson[$navPersonId]['offene_aufgaben'][] =
+                    trim($navIdee['offene_aufgaben']);
+            }
+        }
+
+        $navWeihnachtsStatus = array_values($navWeihnachtsStatusNachPerson);
+    }
+}
+
+$navBenachrichtigungsAnzahl =
+    count($navBenachrichtigungen)
+    + (!empty($navWeihnachtsStatus) ? 1 : 0);
+
+?>
 
 <nav class="navbar">
 
@@ -80,28 +160,25 @@ usort($navBenachrichtigungen, function ($a, $b) {
 
     <div class="navbar-right">
 
-  <button class="glocke"
-        popovertarget="benachrichtigungen">
+        <button class="glocke" popovertarget="benachrichtigungen">
 
-    🔔
+            🔔
 
-    <?php if (count($navBenachrichtigungen) > 0): ?>
-        <span class="benachrichtigungs-anzahl">
-            <?= count($navBenachrichtigungen) ?>
-        </span>
-    <?php endif; ?>
+            <?php if ($navBenachrichtigungsAnzahl > 0): ?>
+                <span class="benachrichtigungs-anzahl">
+                    <?= $navBenachrichtigungsAnzahl ?>
+                </span>
+            <?php endif; ?>
 
-</button>
+        </button>
 
-        <a href="index.php"
-           class="home-button">
+        <a href="index.php" class="home-button">
             Home
         </a>
 
     </div>
 
 </nav>
-
 
 <div id="benachrichtigungen"
      popover
@@ -128,10 +205,9 @@ usort($navBenachrichtigungen, function ($a, $b) {
 
     </div>
 
+    <?php if (empty($navBenachrichtigungen) && empty($navWeihnachtsStatus)): ?>
 
-    <?php if (empty($navBenachrichtigungen)): ?>
-
-        <p>Keine anstehenden Anlässe.</p>
+        <p>Keine anstehenden Benachrichtigungen.</p>
 
     <?php else: ?>
 
@@ -167,10 +243,31 @@ usort($navBenachrichtigungen, function ($a, $b) {
 
         <?php endforeach; ?>
 
+        <?php if (!empty($navWeihnachtsStatus)): ?>
+
+            <h3>Weihnachtsstatus</h3>
+
+            <?php foreach ($navWeihnachtsStatus as $navStatus): ?>
+
+                <p>
+    <strong><?= htmlspecialchars($navStatus['person']) ?>:</strong>
+
+    <?php
+    $navStatusText = $navStatus['besorgt'] === $navStatus['ideen']
+        ? 'Besorgt'
+        : 'Offen';
+    ?>
+
+    Status: <strong><?= $navStatusText ?></strong>
+</p>
+
+            <?php endforeach; ?>
+
+        <?php endif; ?>
+
     <?php endif; ?>
 
 </div>
-
 
 <div id="benachrichtigungs-einstellungen"
      popover

@@ -46,48 +46,103 @@ class Geschenkidee
      *                             ausschliesslich fuer einen anderen Anlass (z. B. Hochzeit)
      *                             oder ganz ohne Anlass gedacht sein kann
      */
-    public static function erstellen(int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = [], bool $fuerGeburtstag = false): void
-    {
-        $pdo = Datenbank::verbinden();
-        $stmt = $pdo->prepare(
-            'INSERT INTO geschenkideen (person_id, text, link, bild_link, fuer_geburtstag)
-             VALUES (:person_id, :text, :link, :bild_link, :fuer_geburtstag)'
-        );
-        $stmt->execute([
-            'person_id' => $personId,
-            'text' => $text,
-            'link' => $link,
-            'bild_link' => $bildLink,
-            'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
-        ]);
+    public static function erstellen(
+    int $personId,
+    ?string $text,
+    ?string $link,
+    ?string $bildLink,
+    array $anlassIds = [],
+    bool $fuerGeburtstag = false,
+    bool $besorgt = false,
+    ?string $offeneAufgaben = null
+): void
+{
+    $pdo = Datenbank::verbinden();
 
-        self::anlaesseVerknuepfen($pdo, (int) $pdo->lastInsertId(), $anlassIds);
-    }
+    $stmt = $pdo->prepare(
+        'INSERT INTO geschenkideen (
+            person_id,
+            text,
+            link,
+            bild_link,
+            fuer_geburtstag,
+            besorgt,
+            offene_aufgaben
+        )
+        VALUES (
+            :person_id,
+            :text,
+            :link,
+            :bild_link,
+            :fuer_geburtstag,
+            :besorgt,
+            :offene_aufgaben
+        )'
+    );
+
+    $stmt->execute([
+        'person_id' => $personId,
+        'text' => $text,
+        'link' => $link,
+        'bild_link' => $bildLink,
+        'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
+        'besorgt' => $besorgt ? 1 : 0,
+        'offene_aufgaben' => $offeneAufgaben,
+    ]);
+
+    self::anlaesseVerknuepfen(
+        $pdo,
+        (int) $pdo->lastInsertId(),
+        $anlassIds
+    );
+}
 
     /**
      * @param int[] $anlassIds
      */
-    public static function aktualisieren(int $id, int $personId, ?string $text, ?string $link, ?string $bildLink, array $anlassIds = [], bool $fuerGeburtstag = false): void
-    {
-        $pdo = Datenbank::verbinden();
-        $stmt = $pdo->prepare(
-            'UPDATE geschenkideen
-             SET person_id = :person_id, text = :text, link = :link, bild_link = :bild_link,
-                 fuer_geburtstag = :fuer_geburtstag
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'person_id' => $personId,
-            'text' => $text,
-            'link' => $link,
-            'bild_link' => $bildLink,
-            'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
-            'id' => $id,
-        ]);
+public static function aktualisieren(
+    int $id,
+    int $personId,
+    ?string $text,
+    ?string $link,
+    ?string $bildLink,
+    array $anlassIds = [],
+    bool $fuerGeburtstag = false,
+    bool $besorgt = false,
+    ?string $offeneAufgaben = null
+): void
+{
+    $pdo = Datenbank::verbinden();
 
-        self::anlaesseVerknuepfen($pdo, $id, $anlassIds);
-    }
+    $stmt = $pdo->prepare(
+        'UPDATE geschenkideen
+         SET person_id = :person_id,
+             text = :text,
+             link = :link,
+             bild_link = :bild_link,
+             fuer_geburtstag = :fuer_geburtstag,
+             besorgt = :besorgt,
+             offene_aufgaben = :offene_aufgaben
+         WHERE id = :id'
+    );
 
+    $stmt->execute([
+        'person_id' => $personId,
+        'text' => $text,
+        'link' => $link,
+        'bild_link' => $bildLink,
+        'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
+        'besorgt' => $besorgt ? 1 : 0,
+        'offene_aufgaben' => $offeneAufgaben,
+        'id' => $id,
+    ]);
+
+    self::anlaesseVerknuepfen(
+        $pdo,
+        $id,
+        $anlassIds
+    );
+}
     /**
      * Wandelt die Idee in ein "festes" Geschenk fuer $anlassId um (Idee->Geschenk-Umwandlung,
      * Aufgabenstellung: "inkl. Anlass und Datum"). Das Datum wird HIER eingefroren
@@ -151,6 +206,72 @@ class Geschenkidee
             'id' => $id,
         ]);
     }
+    public static function vergangenMachen(int $id, int $anlassId, string $datum): bool
+{
+    $anlass = Anlass::finden($anlassId);
+    $geschenkDatum = DateTimeImmutable::createFromFormat('Y-m-d', $datum);
+
+    if ($anlass === null
+        || $geschenkDatum === false
+        || $geschenkDatum->format('Y-m-d') !== $datum
+        || $geschenkDatum >= new DateTimeImmutable('today')) {
+        return false;
+    }
+
+    $pdo = Datenbank::verbinden();
+    $stmt = $pdo->prepare(
+        'UPDATE geschenkideen
+         SET geschenk_anlass_id = :anlass_id,
+             geschenk_fuer_geburtstag = 0,
+             geschenk_datum = :geschenk_datum,
+             besorgt = 1
+         WHERE id = :id'
+    );
+
+    $stmt->execute([
+        'anlass_id' => $anlassId,
+        'geschenk_datum' => $datum,
+        'id' => $id,
+    ]);
+
+    return true;
+}
+
+public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bool
+{
+    $idee = self::finden($id);
+    $geschenkDatum = DateTimeImmutable::createFromFormat('Y-m-d', $datum);
+
+    if ($idee === null
+        || $geschenkDatum === false
+        || $geschenkDatum->format('Y-m-d') !== $datum
+        || $geschenkDatum >= new DateTimeImmutable('today')) {
+        return false;
+    }
+
+    $person = Person::finden((int) $idee['person_id']);
+
+    if ($person === null) {
+        return false;
+    }
+
+    $pdo = Datenbank::verbinden();
+    $stmt = $pdo->prepare(
+        'UPDATE geschenkideen
+         SET geschenk_anlass_id = NULL,
+             geschenk_fuer_geburtstag = 1,
+             geschenk_datum = :geschenk_datum,
+             besorgt = 1
+         WHERE id = :id'
+    );
+
+    $stmt->execute([
+        'geschenk_datum' => $datum,
+        'id' => $id,
+    ]);
+
+    return true;
+}
 
     /**
      * Macht eine feste Geschenk-Zuordnung rueckgaengig - die Idee gilt danach wieder als

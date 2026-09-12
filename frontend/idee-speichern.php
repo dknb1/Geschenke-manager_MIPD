@@ -10,6 +10,8 @@ $link = '';
 $bildLink = '';
 $anlassIds = [];
 $fuerGeburtstag = false;
+$besorgt = false;
+$offeneAufgaben = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $personId = trim($_POST['person'] ?? '');
@@ -17,6 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $link = trim($_POST['link'] ?? '');
     $bildLink = trim($_POST['bild_link'] ?? '');
     $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
+    $besorgt = isset($_POST['besorgt']);
+    $offeneAufgaben = trim($_POST['offene_aufgaben'] ?? '');
     $gueltigeAnlassIds = array_column(Anlass::alle(), 'id');
     $anlassIds = array_values(array_intersect(
         array_map('intval', $_POST['anlass_ids'] ?? []),
@@ -33,7 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $link !== '' ? $link : null,
             $bildLink !== '' ? $bildLink : null,
             $anlassIds,
-            $fuerGeburtstag
+            $fuerGeburtstag,
+            $besorgt,
+            $offeneAufgaben !== '' ? $offeneAufgaben : null
         );
         header('Location: idee-speichern.php');
         exit;
@@ -98,6 +104,19 @@ $ideen = Geschenkidee::alle();
             <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
             Diese Idee ist auch für den Geburtstag der ausgewählten Person gedacht
         </label>
+
+        <label>
+    <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
+    Geschenk bereits besorgt
+</label>
+
+<label for="offene_aufgaben">Offene Aufgaben:</label>
+<textarea
+    id="offene_aufgaben"
+    name="offene_aufgaben"
+    maxlength="1000"
+><?= htmlspecialchars($offeneAufgaben) ?></textarea>
+
 
         <button type="submit">Idee speichern</button>
 

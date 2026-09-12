@@ -14,13 +14,15 @@ class Datenbank
      * (bestehende Zeilen bleiben erhalten, neue Spalte wird mit ihrem DEFAULT-Wert befuellt).
      */
     private const NACHTRAEGLICHE_SPALTEN = [
-        'geschenkideen' => [
-            'fuer_geburtstag' => 'INTEGER NOT NULL DEFAULT 0',
-            'geschenk_anlass_id' => 'INTEGER REFERENCES anlaesse(id) ON DELETE SET NULL',
-            'geschenk_fuer_geburtstag' => 'INTEGER NOT NULL DEFAULT 0',
-            'geschenk_datum' => 'TEXT',
-        ],
-    ];
+    'geschenkideen' => [
+        'fuer_geburtstag' => 'INTEGER NOT NULL DEFAULT 0',
+        'geschenk_anlass_id' => 'INTEGER REFERENCES anlaesse(id) ON DELETE SET NULL',
+        'geschenk_fuer_geburtstag' => 'INTEGER NOT NULL DEFAULT 0',
+        'geschenk_datum' => 'TEXT',
+        'besorgt' => 'INTEGER NOT NULL DEFAULT 0',
+        'offene_aufgaben' => 'TEXT',
+    ],
+];
 
     public static function verbinden(): PDO
     {
