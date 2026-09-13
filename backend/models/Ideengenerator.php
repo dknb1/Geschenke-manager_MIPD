@@ -77,15 +77,20 @@ class Ideengenerator
     {
         $liste = implode("\n", array_map(fn (string $b) => '- ' . $b, $beispiele));
 
+        // Bewusst KEINE konkreten Beispiel-Produktnamen im Prompt (z. B. "Kopfhörer") - ein
+        // erster Testlauf hat gezeigt, dass das Modell ein im Prompt genanntes Beispiel
+        // ("Bluetooth-Kopfhörer") einfach woertlich als eigenen "neuen" Vorschlag zurueckgab,
+        // statt selbst etwas zur Liste Passendes zu erfinden. Stattdessen nur erkennbare
+        // Platzhalter ("Platzhalter 1" usw.), die nicht wie ein echtes Geschenk aussehen.
         return "Hier ist eine Liste bereits verschenkter oder geplanter Geschenke einer Person:\n"
             . $liste
-            . "\n\nSchlage darauf basierend genau drei NEUE, passende Geschenkideen vor, die noch "
-            . 'nicht in der Liste stehen. Jeder Vorschlag ist ein kurzer, konkreter Produkt- oder '
-            . 'Geschenkname AUF DEUTSCH - das darf ein einzelnes Wort ODER mehrere Wörter sein '
-            . '(z. B. auch "E-Book-Reader" oder "Bluetooth-Kopfhörer"), Hauptsache kurz und konkret '
-            . 'statt einer ausführlichen Beschreibung. Antworte AUSSCHLIESSLICH mit einem JSON-Array '
-            . 'aus genau drei solchen deutschsprachigen Vorschlägen, ohne jede weitere Erklärung, '
-            . 'zum Beispiel ["Kopfhörer", "E-Book-Reader", "Wanderrucksack"].';
+            . "\n\nSchlage darauf basierend genau drei NEUE, zur Liste passende Geschenkideen vor, "
+            . 'die noch nicht in der Liste stehen. Ein Vorschlag ist ein kurzer, konkreter Produkt- '
+            . 'oder Geschenkname auf Deutsch - er kann aus einem einzelnen Wort oder aus mehreren '
+            . 'Wörtern bestehen, solange diese Wörter zusammen EINEN Namen ergeben (kein ganzer Satz, '
+            . 'keine Erklärung). Antworte AUSSCHLIESSLICH mit einem JSON-Array aus genau drei solchen '
+            . 'Namen, im Format ["Platzhalter 1", "Platzhalter 2", "Platzhalter 3"] - ersetze diese '
+            . 'drei Platzhalter durch deine eigenen, zur Liste oben passenden Vorschläge.';
     }
 
     private static function anfrageSenden(string $apiKey, string $prompt): ?string
