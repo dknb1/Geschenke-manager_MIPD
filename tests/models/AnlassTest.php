@@ -166,6 +166,23 @@ final class AnlassTest extends ModelTestCase
         $this->assertSame(['Weihnachten'], $namen);
     }
 
+    public function testVonPersonInklGeschuetzteKombiniertBeideListen(): void
+    {
+        Person::erstellen('Max', '1990-01-01', null, null);
+        Person::erstellen('Anna', '1992-02-02', null, null);
+        $maxId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Max'))[0]['id'];
+        $annaId = (int) array_values(array_filter(Person::alle(), fn (array $p) => $p['name'] === 'Anna'))[0]['id'];
+
+        Anlass::erstellen('Anlass mit Max', '2026-06-01', false, [$maxId]);
+        Anlass::erstellen('Anlass mit Anna', '2026-07-01', false, [$annaId]);
+
+        $namenVonMax = array_column(Anlass::vonPersonInklGeschuetzte($maxId), 'name');
+
+        // Weihnachten (geschuetzt, betrifft fachlich alle Personen) taucht zusaetzlich zum
+        // individuell verknuepften Anlass auf, "Anlass mit Anna" dagegen nicht.
+        $this->assertSame(['Anlass mit Max', 'Weihnachten'], $namenVonMax);
+    }
+
     public function testGeschuetzterAnlassKannNichtGeloeschtWerden(): void
     {
         $weihnachten = $this->findeAnlassNachName('Weihnachten');

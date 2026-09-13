@@ -40,11 +40,7 @@ $personen = Person::alle();
         <?php foreach ($personen as $person): ?>
 
             <?php
-            $verknuepfteAnlaesse = array_merge(Anlass::geschuetzte(), Anlass::vonPerson((int) $person['id']));
-            usort(
-                $verknuepfteAnlaesse,
-                fn (array $a, array $b) => Anlass::naechstesVorkommen($a) <=> Anlass::naechstesVorkommen($b)
-            );
+            $verknuepfteAnlaesse = Anlass::vonPersonInklGeschuetzte((int) $person['id']);
 
             $geschenkideenSortiert = Geschenkidee::sortiereAktuellUndVergangen(
                 Geschenkidee::vonPerson((int) $person['id'])

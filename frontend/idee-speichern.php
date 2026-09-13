@@ -4,30 +4,52 @@ require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 
 $fehler = [];
-$personId = '';
+$aktion = $_POST['aktion'] ?? '';
+$personId = trim($_POST['person'] ?? ($_GET['person'] ?? ''));
 $text = '';
 $link = '';
 $bildLink = '';
-$anlassIds = [];
 $fuerGeburtstag = false;
 $besorgt = false;
 $offeneAufgaben = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $personId = trim($_POST['person'] ?? '');
     $text = trim($_POST['text'] ?? '');
     $link = trim($_POST['link'] ?? '');
     $bildLink = trim($_POST['bild_link'] ?? '');
     $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
     $besorgt = isset($_POST['besorgt']);
     $offeneAufgaben = trim($_POST['offene_aufgaben'] ?? '');
-    $gueltigeAnlassIds = array_column(Anlass::alle(), 'id');
-    $anlassIds = array_values(array_intersect(
-        array_map('intval', $_POST['anlass_ids'] ?? []),
-        $gueltigeAnlassIds
-    ));
+}
 
-    $person = $personId !== '' ? Person::finden((int) $personId) : null;
+$person = $personId !== '' ? Person::finden((int) $personId) : null;
+
+// Nur Anlaesse DIESER Person (plus geschuetzte, die fachlich immer alle betreffen) zur Auswahl
+// anbieten statt der kompletten Anlass-Liste aller Personen - sonst muesste man aus einer
+// potenziell langen, personenfremden Liste raten, welche Anlaesse ueberhaupt zur gewaehlten
+// Person passen. Siehe Anlass::vonPerson()/geschuetzte(), analog zu gesamtliste.php.
+$gueltigeAnlaesse = $person !== null ? Anlass::vonPersonInklGeschuetzte((int) $personId) : [];
+$gueltigeAnlassIds = array_column($gueltigeAnlaesse, 'id');
+// Absichtlich IMMER gegen die aktuell gueltigen IDs der (ggf. gerade erst gewaehlten) Person
+// gefiltert, nicht nur beim expliziten "Anlaesse laden" - falls die Person zwischen zwei
+// Anfragen gewechselt wurde, fallen dadurch automatisch nicht mehr passende Auswahlen raus,
+// statt versehentlich Anlaesse der vorherigen Person zu speichern.
+$anlassIds = array_values(array_intersect(
+    array_map('intval', $_POST['anlass_ids'] ?? []),
+    $gueltigeAnlassIds
+));
+
+// Das Anlass-Popup zeigt nur dann verlaesslich die Anlaesse DIESER Person, wenn es entweder
+// gerade explizit ueber den "Anlass auswählen"-Button neu geladen wurde, oder die Person schon
+// beim Seitenaufruf feststand (Direktlink von person-bearbeiten.php mit ?person=ID, siehe dort).
+// Bei jedem anderen POST (z. B. einem fehlgeschlagenen Speichern-Versuch nach Personenwechsel)
+// wird das Popup bewusst NICHT als "bereit" markiert, damit es nie versehentlich die Anlaesse
+// einer inzwischen abgewaehlten Person zeigt - ohne JavaScript kann eine Aenderung der
+// Personenauswahl sonst nicht erkannt werden.
+$anlaesseGeladen = $person !== null
+    && ($aktion === 'anlaesse_laden' || $_SERVER['REQUEST_METHOD'] !== 'POST');
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $aktion === 'speichern') {
     $fehler = Geschenkidee::validiereEingabe($person, $text, $link, $bildLink, $offeneAufgaben);
 
     if (empty($fehler)) {
@@ -47,7 +69,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $personen = Person::alle();
-$anlaesse = Anlass::alle();
 $ideen = Geschenkidee::alle();
 ?>
 <!DOCTYPE html>
@@ -77,12 +98,52 @@ $ideen = Geschenkidee::alle();
         <label for="person">Person:</label>
         <select id="person" name="person">
             <option value="">Person auswählen</option>
-            <?php foreach ($personen as $person): ?>
-                <option value="<?= (int) $person['id'] ?>" <?= (string) $person['id'] === $personId ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($person['name']) ?>
+            <?php foreach ($personen as $p): ?>
+                <option value="<?= (int) $p['id'] ?>" <?= (string) $p['id'] === $personId ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($p['name']) ?>
                 </option>
             <?php endforeach; ?>
         </select>
+
+        <?php if (!$anlaesseGeladen): ?>
+
+            <button type="submit" name="aktion" value="anlaesse_laden">Anlass auswählen</button>
+
+            <?php if ($aktion === 'anlaesse_laden' && $person === null): ?>
+                <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
+            <?php endif; ?>
+
+        <?php else: ?>
+
+            <button type="button" popovertarget="anlass-popover">
+                Anlass auswählen<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
+            </button>
+
+            <div id="anlass-popover" popover class="benachrichtigungs-fenster anlass-popover">
+
+                <div class="fenster-kopf">
+                    <h3>Anlässe von <?= htmlspecialchars($person['name']) ?></h3>
+                    <button class="schliessen" type="button" popovertarget="anlass-popover" popovertargetaction="hide">×</button>
+                </div>
+
+                <?php if (empty($gueltigeAnlaesse)): ?>
+                    <p>Für diese Person sind noch keine Anlässe hinterlegt.</p>
+                <?php else: ?>
+                    <?php foreach ($gueltigeAnlaesse as $anlass): ?>
+                        <label class="anlass-checkbox">
+                            <input type="checkbox" name="anlass_ids[]" value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'checked' : '' ?>>
+                            <?= htmlspecialchars($anlass['name']) ?>
+                        </label>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+
+            </div>
+
+            <?php if (!empty($personen)): ?>
+                <p class="hinweis">Andere Person gewählt? Vor dem Öffnen erneut auf "Anlass auswählen" klicken, um die Liste zu aktualisieren.</p>
+            <?php endif; ?>
+
+        <?php endif; ?>
 
         <label for="text">Idee / Beschreibung:</label>
         <textarea id="text" name="text" maxlength="1000"><?= htmlspecialchars($text) ?></textarea>
@@ -92,13 +153,6 @@ $ideen = Geschenkidee::alle();
 
         <label for="bild_link">Bild (Link):</label>
         <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
-
-        <label for="anlass_ids">Weitere Anlässe (optional, Mehrfachauswahl möglich):</label>
-        <select id="anlass_ids" name="anlass_ids[]" multiple size="8">
-            <?php foreach ($anlaesse as $anlass): ?>
-                <option value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($anlass['name']) ?></option>
-            <?php endforeach; ?>
-        </select>
 
         <label>
             <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
@@ -113,7 +167,7 @@ $ideen = Geschenkidee::alle();
         <label for="offene_aufgaben">Offene Aufgaben:</label>
         <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>
 
-        <button type="submit">Idee speichern</button>
+        <button type="submit" name="aktion" value="speichern">Idee speichern</button>
 
     </form>
 

@@ -23,11 +23,7 @@ $geburtsdatum = $person['geburtsdatum'];
 $geschlecht = $person['geschlecht'] ?? '';
 $details = $person['details'] ?? '';
 
-$verknuepfteAnlaesse = array_merge(Anlass::geschuetzte(), Anlass::vonPerson($id));
-usort(
-    $verknuepfteAnlaesse,
-    fn (array $a, array $b) => Anlass::naechstesVorkommen($a) <=> Anlass::naechstesVorkommen($b)
-);
+$verknuepfteAnlaesse = Anlass::vonPersonInklGeschuetzte($id);
 
 $geschenkideenDieserPerson = Geschenkidee::vonPerson($id);
 $geschenkideenSortiert = Geschenkidee::sortiereAktuellUndVergangen($geschenkideenDieserPerson);
@@ -131,6 +127,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endforeach; ?>
     <?php endif; ?>
     <h2>Aktuelle Geschenkideen für <?= htmlspecialchars($name) ?></h2>
+
+    <p>
+        <a href="idee-speichern.php?person=<?= $id ?>">Neue Geschenkidee für <?= htmlspecialchars($name) ?> anlegen</a>
+    </p>
 
     <?php if (empty($aktuelleGeschenkideen)): ?>
         <p>Keine aktuellen Geschenkideen hinterlegt.</p>

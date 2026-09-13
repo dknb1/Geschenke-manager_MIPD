@@ -27,17 +27,25 @@ $fuerGeburtstag = (int) $idee['fuer_geburtstag'] === 1;
 $besorgt = (int) ($idee['besorgt'] ?? 0) === 1;
 $offeneAufgaben = $idee['offene_aufgaben'] ?? '';
 
-// Anlaesse, die man fest zuordnen darf - keine Anlaesse, deren naechstes Vorkommen bereits
-// vergangen ist (siehe Geschenkidee::istGueltigerZielAnlass()). Bei wiederkehrenden Anlaessen
-// ist das ohnehin immer erfuellt.
+// Anlaesse, die dieser Person zugeordnet werden duerfen - nicht Anlass::alle(), sonst muesste
+// man aus der kompletten, personenfremden Liste raten, welche Anlaesse ueberhaupt zu dieser
+// Person passen (siehe Anlass::vonPersonInklGeschuetzte()).
+$gueltigeAnlaesse = $personId !== '' ? Anlass::vonPersonInklGeschuetzte((int) $personId) : [];
+
+// Fuer "Fest zuordnen" zusaetzlich auf noch nicht vergangene Anlaesse eingeschraenkt (siehe
+// Geschenkidee::istGueltigerZielAnlass()) - bei wiederkehrenden Anlaessen ohnehin immer erfuellt.
 $heute = new DateTimeImmutable('today');
 $gueltigeFestAnlaesse = array_values(array_filter(
-    Anlass::alle(),
+    $gueltigeAnlaesse,
     fn (array $a) => Geschenkidee::istGueltigerZielAnlass($a, $heute)
 ));
 
+$aktion = $_POST['aktion'] ?? '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $aktion = $_POST['aktion'] ?? 'speichern';
+    if ($aktion === '') {
+        $aktion = 'speichern';
+    }
 
     if ($aktion === 'loeschen') {
         Geschenkidee::loeschen($id);
@@ -101,7 +109,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
         $besorgt = isset($_POST['besorgt']);
         $offeneAufgaben = trim($_POST['offene_aufgaben'] ?? '');
-        $gueltigeAnlassIds = array_column(Anlass::alle(), 'id');
+        // Neu anhand der (evtl. gerade geaenderten) Person berechnet statt der oben fuer
+        // fest_machen() ermittelten Liste - falls die Person hier gewechselt wurde, sollen
+        // nur noch deren Anlaesse als gueltig gelten.
+        $gueltigeAnlaesse = $personId !== '' ? Anlass::vonPersonInklGeschuetzte((int) $personId) : [];
+        $gueltigeAnlassIds = array_column($gueltigeAnlaesse, 'id');
         $anlassIds = array_values(array_intersect(
             array_map('intval', $_POST['anlass_ids'] ?? []),
             $gueltigeAnlassIds
@@ -129,8 +141,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $personen = Person::alle();
-$anlaesse = Anlass::alle();
 $aktuellePerson = Person::finden((int) $personId);
+
+// Siehe idee-speichern.php fuer die ausfuehrliche Begruendung: das Anlass-Popup gilt nur dann
+// als "bereit", wenn es entweder gerade explizit neu geladen wurde, oder die Person schon beim
+// Seitenaufruf feststand (hier: beim ersten Laden immer der Fall, da die Idee bereits eine
+// Person hat) - so zeigt es nie versehentlich die Anlaesse einer inzwischen geaenderten Person.
+$anlaesseGeladen = $aktuellePerson !== null
+    && ($aktion === 'anlaesse_laden' || $_SERVER['REQUEST_METHOD'] !== 'POST');
 
 $istFest = Geschenkidee::istFest($idee);
 $festName = null;
@@ -170,12 +188,52 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
         <label for="person">Person:</label>
         <select id="person" name="person">
             <option value="">Person auswählen</option>
-            <?php foreach ($personen as $person): ?>
-                <option value="<?= (int) $person['id'] ?>" <?= (string) $person['id'] === $personId ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($person['name']) ?>
+            <?php foreach ($personen as $p): ?>
+                <option value="<?= (int) $p['id'] ?>" <?= (string) $p['id'] === $personId ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($p['name']) ?>
                 </option>
             <?php endforeach; ?>
         </select>
+
+        <label>Weitere Anlässe (optional):</label>
+
+        <?php if (!$anlaesseGeladen): ?>
+
+            <button type="submit" name="aktion" value="anlaesse_laden">Anlass auswählen</button>
+
+            <?php if ($aktion === 'anlaesse_laden' && $aktuellePerson === null): ?>
+                <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
+            <?php endif; ?>
+
+        <?php else: ?>
+
+            <button type="button" popovertarget="anlass-popover">
+                Anlass auswählen<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
+            </button>
+
+            <div id="anlass-popover" popover class="benachrichtigungs-fenster anlass-popover">
+
+                <div class="fenster-kopf">
+                    <h3>Anlässe von <?= htmlspecialchars($aktuellePerson['name']) ?></h3>
+                    <button class="schliessen" type="button" popovertarget="anlass-popover" popovertargetaction="hide">×</button>
+                </div>
+
+                <?php if (empty($gueltigeAnlaesse)): ?>
+                    <p>Für diese Person sind noch keine Anlässe hinterlegt.</p>
+                <?php else: ?>
+                    <?php foreach ($gueltigeAnlaesse as $anlass): ?>
+                        <label class="anlass-checkbox">
+                            <input type="checkbox" name="anlass_ids[]" value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'checked' : '' ?>>
+                            <?= htmlspecialchars($anlass['name']) ?>
+                        </label>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+
+            </div>
+
+            <p class="hinweis">Andere Person gewählt? Vor dem Öffnen erneut auf "Anlass auswählen" klicken, um die Liste zu aktualisieren.</p>
+
+        <?php endif; ?>
 
         <label for="text">Idee / Beschreibung:</label>
         <textarea id="text" name="text" maxlength="1000"><?= htmlspecialchars($text) ?></textarea>
@@ -185,13 +243,6 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
         <label for="bild_link">Bild (Link):</label>
         <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
-
-        <label for="anlass_ids">Weitere Anlässe (optional, Mehrfachauswahl möglich):</label>
-        <select id="anlass_ids" name="anlass_ids[]" multiple size="8">
-            <?php foreach ($anlaesse as $anlass): ?>
-                <option value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($anlass['name']) ?></option>
-            <?php endforeach; ?>
-        </select>
 
         <label>
             <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
@@ -233,7 +284,7 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
                     Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?>
                 </option>
 
-                <?php foreach ($anlaesse as $anlass): ?>
+                <?php foreach ($gueltigeAnlaesse as $anlass): ?>
                     <option value="<?= (int) $anlass['id'] ?>">
                         <?= htmlspecialchars($anlass['name']) ?>
                     </option>

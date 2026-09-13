@@ -233,6 +233,25 @@ class Anlass
     }
 
     /**
+     * Alle Anlaesse EINER Person: ihre individuell verknuepften (vonPerson()) plus die
+     * geschuetzten, die fachlich immer alle Personen gleichzeitig betreffen (geschuetzte()) -
+     * sortiert nach naechstem Vorkommen. Zentrale Stelle statt dasselbe
+     * array_merge()+usort() in person-bearbeiten.php, gesamtliste.php und den
+     * Geschenkideen-Formularen dupliziert zu pflegen.
+     */
+    public static function vonPersonInklGeschuetzte(int $personId): array
+    {
+        $anlaesse = array_merge(self::geschuetzte(), self::vonPerson($personId));
+
+        usort(
+            $anlaesse,
+            fn (array $a, array $b) => self::naechstesVorkommen($a) <=> self::naechstesVorkommen($b)
+        );
+
+        return $anlaesse;
+    }
+
+    /**
      * Alle geschuetzten Pflichtanlaesse (aktuell: Weihnachten), sortiert nach naechstem
      * Vorkommen. Geschuetzte Anlaesse betreffen fachlich immer alle Personen gleichzeitig
      * (siehe aktualisieren()) und werden deshalb nicht ueber anlass_personen verknuepft -
