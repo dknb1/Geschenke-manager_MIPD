@@ -198,9 +198,9 @@ final class GeschenkideeTest extends ModelTestCase
         Geschenkidee::erstellen($personId, 'Hochzeitsgeschenk', null, null, [$anlassId]);
         $id = (int) $this->findeIdeeNachText('Hochzeitsgeschenk')['id'];
 
-        $namen = Geschenkidee::anlassNamenInklGeburtstag($id);
+        $namen = Geschenkidee::anlassNamenInklGeburtstag($id, new DateTimeImmutable('2026-01-01'));
 
-        $this->assertSame(['Hochzeit'], $namen);
+        $this->assertSame(['Hochzeit - 01.06.2026'], $namen);
         $this->assertNotContains('Geburtstag Max', $namen);
     }
 
@@ -214,23 +214,26 @@ final class GeschenkideeTest extends ModelTestCase
         Geschenkidee::erstellen($personId, 'Idee für Anna', null, null, [$anlassId], true);
         $id = (int) $this->findeIdeeNachText('Idee für Anna')['id'];
 
-        $namen = Geschenkidee::anlassNamenInklGeburtstag($id);
+        $namen = Geschenkidee::anlassNamenInklGeburtstag($id, new DateTimeImmutable('2026-01-01'));
 
-        $this->assertContains('Weihnachtsfeier', $namen);
-        $this->assertContains('Geburtstag Anna', $namen);
+        $this->assertContains('Weihnachtsfeier - 01.12.2026', $namen);
+        $this->assertContains('Geburtstag Anna - 20.03.2026', $namen);
     }
 
     public function testAktualisierenAendertGeburtstagsFlag(): void
     {
+        $heute = new DateTimeImmutable('2026-06-01');
         $personId = $this->testPersonAnlegen('Tim');
         Geschenkidee::erstellen($personId, 'Idee für Tim', null, null, [], false);
         $id = (int) $this->findeIdeeNachText('Idee für Tim')['id'];
 
-        $this->assertNotContains('Geburtstag Tim', Geschenkidee::anlassNamenInklGeburtstag($id));
+        $this->assertNotContains('Geburtstag Tim', Geschenkidee::anlassNamenInklGeburtstag($id, $heute));
 
         Geschenkidee::aktualisieren($id, $personId, 'Idee für Tim', null, null, [], true);
 
-        $this->assertContains('Geburtstag Tim', Geschenkidee::anlassNamenInklGeburtstag($id));
+        // Tims Geburtstag ist der 1.1. (testPersonAnlegen()) - relativ zu $heute (1.6.2026)
+        // bereits vorbei, deshalb naechstes Vorkommen erst 2027.
+        $this->assertContains('Geburtstag Tim - 01.01.2027', Geschenkidee::anlassNamenInklGeburtstag($id, $heute));
     }
 
     public function testFestMachenSetztAnlassUndDatumUndUeberschreibtDieAnzeige(): void
@@ -256,7 +259,8 @@ final class GeschenkideeTest extends ModelTestCase
 
         // Sobald fest, zeigt die Anzeige NUR noch den festen Anlass - Jubilaeum und Geburtstag
         // verschwinden aus der Anzeige, obwohl die losen Tags in der DB unveraendert bleiben.
-        $this->assertSame(['Hochzeit'], Geschenkidee::anlassNamenInklGeburtstag($id));
+        $erwartetesDatum = (new DateTimeImmutable($inZweiMonaten))->format('d.m.Y');
+        $this->assertSame(['Hochzeit - ' . $erwartetesDatum], Geschenkidee::anlassNamenInklGeburtstag($id));
     }
 
     public function testZurueckAufOffenBringtLoseTagsZurueck(): void
@@ -271,7 +275,8 @@ final class GeschenkideeTest extends ModelTestCase
         $id = (int) $this->findeIdeeNachText('Idee')['id'];
 
         Geschenkidee::festMachen($id, $hochzeitId);
-        $this->assertSame(['Hochzeit'], Geschenkidee::anlassNamenInklGeburtstag($id));
+        $erwartetesDatum = (new DateTimeImmutable($inZweiMonaten))->format('d.m.Y');
+        $this->assertSame(['Hochzeit - ' . $erwartetesDatum], Geschenkidee::anlassNamenInklGeburtstag($id));
 
         Geschenkidee::zurueckAufOffen($id);
 
@@ -279,10 +284,13 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertNull($aktualisiert['geschenk_anlass_id']);
         $this->assertNull($aktualisiert['geschenk_datum']);
         // Die urspruenglichen losen Tags (Hochzeit + Geburtstag) sind nie geloescht worden und
-        // tauchen jetzt automatisch wieder auf.
-        $namen = Geschenkidee::anlassNamenInklGeburtstag($id);
-        $this->assertContains('Hochzeit', $namen);
-        $this->assertContains('Geburtstag Anna', $namen);
+        // tauchen jetzt automatisch wieder auf. Fixes $heute (weit in der Vergangenheit, aber
+        // vor $inZweiMonaten), damit Annas Geburtstagsdatum (1.1., testPersonAnlegen()) hier
+        // deterministisch ins naechste Jahr faellt statt vom tatsaechlichen Testdatum abzuhaengen.
+        $heute = new DateTimeImmutable('2020-06-01');
+        $namen = Geschenkidee::anlassNamenInklGeburtstag($id, $heute);
+        $this->assertContains('Hochzeit - ' . $erwartetesDatum, $namen);
+        $this->assertContains('Geburtstag Anna - 01.01.2021', $namen);
     }
 
     public function testAnlassNamenInklGeburtstagZeigtVergangenBeiFestemVergangenemDatum(): void
@@ -299,7 +307,7 @@ final class GeschenkideeTest extends ModelTestCase
         // die Anzeige-Logik fuer bereits vergangene feste Geschenke isoliert zu testen.
         Geschenkidee::festMachen($id, $anlassId);
 
-        $this->assertSame(['Vergangene Feier - vergangen'], Geschenkidee::anlassNamenInklGeburtstag($id));
+        $this->assertSame(['Vergangene Feier - 01.01.2020 (vergangen)'], Geschenkidee::anlassNamenInklGeburtstag($id));
     }
 
     public function testIstGueltigerZielAnlassLehntVergangeneEinmaligeAnlaesseAb(): void
@@ -336,7 +344,7 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertContains('Vergangener Anlass', $alleVerknuepften);
 
         $angezeigt = Geschenkidee::anlassNamenInklGeburtstag($id);
-        $this->assertSame(['Zukünftiger Anlass'], $angezeigt);
+        $this->assertSame(['Zukünftiger Anlass - 01.01.2099'], $angezeigt);
     }
 
     public function testFestMachenFuerGeburtstagSetztFlagUndDatumUndUeberschreibtDieAnzeige(): void
@@ -360,7 +368,8 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertTrue(Geschenkidee::istFest($aktualisiert));
         // Nur noch der Geburtstag wird angezeigt, die lose Hochzeit-Verknuepfung verschwindet
         // aus der Anzeige (bleibt aber in der DB, siehe zurueckAufOffen()-Test).
-        $this->assertSame(['Geburtstag Max'], Geschenkidee::anlassNamenInklGeburtstag($id));
+        $erwartetesDatum = (new DateTimeImmutable($aktualisiert['geschenk_datum']))->format('d.m.Y');
+        $this->assertSame(['Geburtstag Max - ' . $erwartetesDatum], Geschenkidee::anlassNamenInklGeburtstag($id));
     }
 
     public function testFestMachenFuerGeburtstagUndFestMachenSchliessenSichGegenseitigAus(): void
@@ -380,7 +389,8 @@ final class GeschenkideeTest extends ModelTestCase
         $aktualisiert = Geschenkidee::finden($id);
         $this->assertSame($hochzeitId, (int) $aktualisiert['geschenk_anlass_id']);
         $this->assertSame(0, (int) $aktualisiert['geschenk_fuer_geburtstag']);
-        $this->assertSame(['Hochzeit'], Geschenkidee::anlassNamenInklGeburtstag($id));
+        $erwartetesDatum = (new DateTimeImmutable($inZweiMonaten))->format('d.m.Y');
+        $this->assertSame(['Hochzeit - ' . $erwartetesDatum], Geschenkidee::anlassNamenInklGeburtstag($id));
     }
 
     public function testZurueckAufOffenSetztAuchGeburtstagsFestFlagZurueck(): void
@@ -446,28 +456,35 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertSame([], $fehler);
     }
 
-    public function testSortiereAktuellUndVergangenTrenntNachGeschenkDatum(): void
+    public function testSortiereNachStatusTrenntInDreiRubriken(): void
     {
         $heute = new DateTimeImmutable('2026-09-12');
         $personId = $this->testPersonAnlegen('Max');
 
         Anlass::erstellen('Vergangene Feier', '2020-01-01', false, []);
         $vergangenerAnlassId = (int) $this->findeAnlassNachName('Vergangene Feier')['id'];
+        Anlass::erstellen('Kommende Feier', '2026-12-24', false, []);
+        $kommendeAnlassId = (int) $this->findeAnlassNachName('Kommende Feier')['id'];
 
         Geschenkidee::erstellen($personId, 'Noch offen', null, null);
+        Geschenkidee::erstellen($personId, 'Fest fuer die Zukunft', null, null);
         Geschenkidee::erstellen($personId, 'Bereits verschenkt', null, null);
         $offeneId = (int) $this->findeIdeeNachText('Noch offen')['id'];
+        $festeId = (int) $this->findeIdeeNachText('Fest fuer die Zukunft')['id'];
         $verschenkteId = (int) $this->findeIdeeNachText('Bereits verschenkt')['id'];
 
+        Geschenkidee::festMachen($festeId, $kommendeAnlassId);
         // festMachen() wuerde einen bereits vergangenen Anlass ueber istGueltigerZielAnlass()
         // normalerweise ablehnen - hier direkt aufgerufen, um gezielt einen "vergangenen"
         // Datensatz zu erzeugen (analog zu testAnlassNamenInklGeburtstagZeigtVergangenBeiFestemVergangenemDatum()).
         Geschenkidee::festMachen($verschenkteId, $vergangenerAnlassId);
 
-        $sortiert = Geschenkidee::sortiereAktuellUndVergangen(Geschenkidee::vonPerson($personId), $heute);
+        $sortiert = Geschenkidee::sortiereNachStatus(Geschenkidee::vonPerson($personId), $heute);
 
-        $this->assertCount(1, $sortiert['aktuell']);
-        $this->assertSame($offeneId, (int) $sortiert['aktuell'][0]['id']);
+        $this->assertCount(1, $sortiert['offen']);
+        $this->assertSame($offeneId, (int) $sortiert['offen'][0]['id']);
+        $this->assertCount(1, $sortiert['fest']);
+        $this->assertSame($festeId, (int) $sortiert['fest'][0]['id']);
         $this->assertCount(1, $sortiert['vergangen']);
         $this->assertSame($verschenkteId, (int) $sortiert['vergangen'][0]['id']);
     }

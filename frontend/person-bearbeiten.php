@@ -26,8 +26,9 @@ $details = $person['details'] ?? '';
 $verknuepfteAnlaesse = Anlass::vonPersonInklGeschuetzte($id);
 
 $geschenkideenDieserPerson = Geschenkidee::vonPerson($id);
-$geschenkideenSortiert = Geschenkidee::sortiereAktuellUndVergangen($geschenkideenDieserPerson);
-$aktuelleGeschenkideen = $geschenkideenSortiert['aktuell'];
+$geschenkideenSortiert = Geschenkidee::sortiereNachStatus($geschenkideenDieserPerson);
+$offeneGeschenkideen = $geschenkideenSortiert['offen'];
+$festeGeschenke = $geschenkideenSortiert['fest'];
 $vergangeneGeschenke = $geschenkideenSortiert['vergangen'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -126,17 +127,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </a>
         <?php endforeach; ?>
     <?php endif; ?>
-    <h2>Aktuelle Geschenkideen für <?= htmlspecialchars($name) ?></h2>
+    <h2>Geschenkideen für <?= htmlspecialchars($name) ?></h2>
 
     <p>
         <a href="idee-speichern.php?person=<?= $id ?>">Neue Geschenkidee für <?= htmlspecialchars($name) ?> anlegen</a>
     </p>
 
-    <?php if (empty($aktuelleGeschenkideen)): ?>
-        <p>Keine aktuellen Geschenkideen hinterlegt.</p>
+    <?php if (empty($offeneGeschenkideen)): ?>
+        <p>Keine offenen Geschenkideen hinterlegt.</p>
     <?php else: ?>
         <ul class="ideen-liste">
-            <?php foreach ($aktuelleGeschenkideen as $idee): ?>
+            <?php foreach ($offeneGeschenkideen as $idee): ?>
                 <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
                     <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
@@ -166,6 +167,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endforeach; ?>
         </ul>
     <?php endif; ?>
+    <h2>Festgelegte Geschenke für <?= htmlspecialchars($name) ?></h2>
+    <?php if (empty($festeGeschenke)): ?>
+        <p>Keine Geschenke fest zugeordnet.</p>
+    <?php else: ?>
+        <ul class="ideen-liste">
+            <?php foreach ($festeGeschenke as $idee): ?>
+                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
+                <li>
+                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
+                        <?php if (!empty($idee['text'])): ?>
+                            <?= htmlspecialchars($idee['text']) ?>
+                        <?php endif; ?>
+                        <?php if (!empty($anlassNamen)): ?>
+                            (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
+                        <?php endif; ?>
+                    </a>
+                    <p>Besorgt: <strong><?= (int) ($idee['besorgt'] ?? 0) === 1 ? 'Ja' : 'Nein' ?></strong></p>
+                    <?php if (!empty($idee['offene_aufgaben'])): ?>
+                        <p>Offene Aufgaben: <?= htmlspecialchars($idee['offene_aufgaben']) ?></p>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
     <h2>Vergangene Geschenke für <?= htmlspecialchars($name) ?></h2>
     <?php if (empty($vergangeneGeschenke)): ?>
         <p>Keine vergangenen Geschenke dokumentiert.</p>
@@ -183,13 +208,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
                         <?php endif; ?>
                     </a>
-
-                    <?php if (!empty($idee['geschenk_datum'])): ?>
-                        <p>
-                            Geschenkt am:
-                            <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>
-                        </p>
-                    <?php endif; ?>
                 </li>
             <?php endforeach; ?>
         </ul>

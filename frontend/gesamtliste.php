@@ -42,10 +42,11 @@ $personen = Person::alle();
             <?php
             $verknuepfteAnlaesse = Anlass::vonPersonInklGeschuetzte((int) $person['id']);
 
-            $geschenkideenSortiert = Geschenkidee::sortiereAktuellUndVergangen(
+            $geschenkideenSortiert = Geschenkidee::sortiereNachStatus(
                 Geschenkidee::vonPerson((int) $person['id'])
             );
-            $aktuelleGeschenkideen = $geschenkideenSortiert['aktuell'];
+            $offeneGeschenkideen = $geschenkideenSortiert['offen'];
+            $festeGeschenke = $geschenkideenSortiert['fest'];
             $vergangeneGeschenke = $geschenkideenSortiert['vergangen'];
 
             $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person);
@@ -88,13 +89,13 @@ $personen = Person::alle();
                     </ul>
                 <?php endif; ?>
 
-                <h3>Aktuelle Geschenkideen</h3>
+                <h3>Geschenkideen</h3>
 
-                <?php if (empty($aktuelleGeschenkideen)): ?>
-                    <p>Keine aktuellen Geschenkideen hinterlegt.</p>
+                <?php if (empty($offeneGeschenkideen)): ?>
+                    <p>Keine offenen Geschenkideen hinterlegt.</p>
                 <?php else: ?>
                     <ul class="ideen-liste">
-                        <?php foreach ($aktuelleGeschenkideen as $idee): ?>
+                        <?php foreach ($offeneGeschenkideen as $idee): ?>
                             <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                             <li>
                                 <?php if (!empty($idee['text'])): ?>
@@ -124,6 +125,31 @@ $personen = Person::alle();
                     </ul>
                 <?php endif; ?>
 
+                <h3>Festgelegte Geschenke</h3>
+
+                <?php if (empty($festeGeschenke)): ?>
+                    <p>Keine Geschenke fest zugeordnet.</p>
+                <?php else: ?>
+                    <ul class="ideen-liste">
+                        <?php foreach ($festeGeschenke as $idee): ?>
+                            <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
+                            <li>
+                                <?php if (!empty($idee['text'])): ?>
+                                    <?= htmlspecialchars($idee['text']) ?>
+                                <?php endif; ?>
+                                <?php if (!empty($anlassNamen)): ?>
+                                    (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
+                                <?php endif; ?>
+
+                                <p>Besorgt: <strong><?= (int) ($idee['besorgt'] ?? 0) === 1 ? 'Ja' : 'Nein' ?></strong></p>
+                                <?php if (!empty($idee['offene_aufgaben'])): ?>
+                                    <p>Offene Aufgaben: <?= htmlspecialchars($idee['offene_aufgaben']) ?></p>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+
                 <h3>Vergangene Geschenke</h3>
 
                 <?php if (empty($vergangeneGeschenke)): ?>
@@ -138,13 +164,6 @@ $personen = Person::alle();
                                 <?php endif; ?>
                                 <?php if (!empty($anlassNamen)): ?>
                                     (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
-                                <?php endif; ?>
-
-                                <?php if (!empty($idee['geschenk_datum'])): ?>
-                                    <p>
-                                        Geschenkt am:
-                                        <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>
-                                    </p>
                                 <?php endif; ?>
                             </li>
                         <?php endforeach; ?>

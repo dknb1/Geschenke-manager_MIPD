@@ -251,33 +251,37 @@ class Geschenkidee
     }
 
     /**
-     * Trennt die Ideen einer Person in "aktuell" (noch offen oder fest fuer einen kommenden
-     * Termin) und "vergangen" (fest zugeordnet mit bereits verstrichenem geschenk_datum) -
-     * zentrale Stelle statt dieselbe Schleife in person-bearbeiten.php und gesamtliste.php
-     * dupliziert zu pflegen.
+     * Trennt die Ideen einer Person in drei Rubriken - "offen" (keine feste Zuordnung), "fest"
+     * (fest zugeordnet, Termin steht noch bevor) und "vergangen" (fest zugeordnet, Termin
+     * bereits verstrichen) - zentrale Stelle statt dieselbe Schleife in person-bearbeiten.php
+     * und gesamtliste.php dupliziert zu pflegen.
      *
      * @param array[] $ideen z. B. das Ergebnis von vonPerson()
-     * @return array{aktuell: array[], vergangen: array[]}
+     * @return array{offen: array[], fest: array[], vergangen: array[]}
      */
-    public static function sortiereAktuellUndVergangen(array $ideen, ?DateTimeImmutable $heute = null): array
+    public static function sortiereNachStatus(array $ideen, ?DateTimeImmutable $heute = null): array
     {
         $heute ??= new DateTimeImmutable('today');
-        $aktuell = [];
+        $offen = [];
+        $fest = [];
         $vergangen = [];
 
         foreach ($ideen as $idee) {
-            $istVergangen = self::istFest($idee)
-                && !empty($idee['geschenk_datum'])
-                && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
+            if (!self::istFest($idee)) {
+                $offen[] = $idee;
+                continue;
+            }
+
+            $istVergangen = !empty($idee['geschenk_datum']) && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
 
             if ($istVergangen) {
                 $vergangen[] = $idee;
             } else {
-                $aktuell[] = $idee;
+                $fest[] = $idee;
             }
         }
 
-        return ['aktuell' => $aktuell, 'vergangen' => $vergangen];
+        return ['offen' => $offen, 'fest' => $fest, 'vergangen' => $vergangen];
     }
 
     /**
@@ -457,10 +461,11 @@ class Geschenkidee
     }
 
     /**
-     * Namen aller Anlaesse, die zu dieser Idee passen - fuer die Anzeige (Ideenlisten).
+     * Namen (inkl. Datum) aller Anlaesse, die zu dieser Idee passen - fuer die Anzeige
+     * (Ideenlisten), im Format "Anlassname - TT.MM.JJJJ".
      *
      * Ist die Idee fest zugeordnet (siehe istFest() - entweder zu einem Anlass oder zum
-     * Geburtstag), wird NUR dieses eine Ziel gezeigt (mit "- vergangen"-Zusatz, falls
+     * Geburtstag), wird NUR dieses eine Ziel gezeigt (mit "(vergangen)"-Zusatz, falls
      * geschenk_datum bereits vorbei ist) - die losen Tags (anlaesse()/fuer_geburtstag) werden
      * dann bewusst ausgeblendet, nicht geloescht: macht man die Fest-Zuordnung rueckgaengig
      * (zurueckAufOffen()), tauchen sie hier automatisch wieder auf.
@@ -474,15 +479,18 @@ class Geschenkidee
      * ausschliesslich ein Hochzeitsgeschenk oder ganz ohne Anlass sein), deshalb haengt das
      * hier vom explizit gesetzten Flag ab statt immer dabei zu sein.
      */
-    public static function anlassNamenInklGeburtstag(int $geschenkideeId): array
+    public static function anlassNamenInklGeburtstag(int $geschenkideeId, ?DateTimeImmutable $heute = null): array
     {
         $idee = self::finden($geschenkideeId);
         if ($idee === null) {
             return [];
         }
 
+        $heute ??= new DateTimeImmutable('today');
+
         if (self::istFest($idee)) {
-            $istVergangen = new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
+            $datum = new DateTimeImmutable($idee['geschenk_datum']);
+            $istVergangen = $datum < $heute;
 
             if ((int) $idee['geschenk_fuer_geburtstag'] === 1) {
                 $person = Person::finden((int) $idee['person_id']);
@@ -498,22 +506,25 @@ class Geschenkidee
                 $name = $festerAnlass['name'];
             }
 
-            return [$name . ($istVergangen ? ' - vergangen' : '')];
+            $namenMitDatum = $name . ' - ' . $datum->format('d.m.Y');
+
+            return [$namenMitDatum . ($istVergangen ? ' (vergangen)' : '')];
         }
 
-        $heute = new DateTimeImmutable('today');
-        $namen = array_column(
-            array_filter(
+        $namen = array_map(
+            fn (array $anlass) => $anlass['name'] . ' - ' . Anlass::naechstesVorkommen($anlass, $heute)->format('d.m.Y'),
+            array_values(array_filter(
                 self::anlaesse($geschenkideeId),
                 fn (array $anlass) => Anlass::naechstesVorkommen($anlass, $heute) >= $heute
-            ),
-            'name'
+            ))
         );
 
         if ((int) $idee['fuer_geburtstag'] === 1) {
             $person = Person::finden((int) $idee['person_id']);
             if ($person !== null) {
-                array_unshift($namen, Person::geburtstagAlsAnlass($person)['name']);
+                $geburtstagAnlass = Person::geburtstagAlsAnlass($person);
+                $geburtstagDatum = Anlass::naechstesVorkommen($geburtstagAnlass, $heute)->format('d.m.Y');
+                array_unshift($namen, $geburtstagAnlass['name'] . ' - ' . $geburtstagDatum);
             }
         }
 
