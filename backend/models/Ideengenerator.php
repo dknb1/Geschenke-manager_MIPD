@@ -85,7 +85,10 @@ class Ideengenerator
 
         $antwort = curl_exec($verbindung);
         $httpCode = curl_getinfo($verbindung, CURLINFO_HTTP_CODE);
-        curl_close($verbindung);
+        // Kein curl_close() noetig: seit PHP 8.0 ist ein curl-Handle ein normales Objekt
+        // (CurlHandle) statt einer manuell zu schliessenden Resource, es wird automatisch per
+        // Garbage Collection freigegeben - curl_close() ist seitdem ein wirkungsloser No-Op
+        // und wird ab PHP 8.5 als deprecated gemeldet.
 
         if ($antwort === false || $httpCode !== 200) {
             return null;
