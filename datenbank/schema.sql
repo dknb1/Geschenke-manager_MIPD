@@ -21,12 +21,18 @@ CREATE TABLE IF NOT EXISTS anlaesse (
 -- anlaesse-Zeile dupliziert, die bei Namens-/Datumsaenderung oder Loeschung der Person sonst
 -- veralten wuerde. Aus demselben Grund gibt es kein gespeichertes "alter" mehr - wird live aus
 -- geburtsdatum berechnet (siehe Person::alter()), damit es nicht mit der Zeit veraltet.
+-- share_token: zufaelliger Zugriffsschluessel fuer den oeffentlichen Share-Link
+-- (frontend/share.php?token=...), NULL solange noch kein Link erstellt wurde. Ein
+-- Neu-Generieren ueberschreibt den alten Token und macht damit automatisch jeden zuvor
+-- verteilten Link ungueltig (siehe Person::shareTokenGenerieren()). UNIQUE, damit ein Token
+-- niemals zwei Personen gleichzeitig zugeordnet sein kann.
 CREATE TABLE IF NOT EXISTS personen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     geburtsdatum TEXT NOT NULL,
     geschlecht TEXT,
     details TEXT,
+    share_token TEXT UNIQUE,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -22,6 +22,9 @@ class Datenbank
         'besorgt' => 'INTEGER NOT NULL DEFAULT 0',
         'offene_aufgaben' => 'TEXT',
     ],
+    'personen' => [
+        'share_token' => 'TEXT',
+    ],
 ];
 
     public static function verbinden(): PDO

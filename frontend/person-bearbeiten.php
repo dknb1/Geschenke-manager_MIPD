@@ -40,6 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($aktion === 'share_link_erstellen') {
+        Person::shareTokenGenerieren($id);
+        header('Location: person-bearbeiten.php?id=' . $id);
+        exit;
+    }
+
     $name = trim($_POST['name'] ?? '');
     $geburtsdatum = trim($_POST['geburtsdatum'] ?? '');
     $geschlecht = $_POST['geschlecht'] ?? '';
@@ -211,6 +217,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </li>
             <?php endforeach; ?>
         </ul>
+    <?php endif; ?>
+
+    <h2>Geschenkideen für <?= htmlspecialchars($name) ?> teilen</h2>
+
+    <?php if (empty($person['share_token'])): ?>
+
+        <p>Noch kein Link erstellt. Der Link zeigt eine schlanke, eigenständige Seite mit den
+            offenen und festgelegten Geschenkideen dieser Person (ohne Login, ohne Zugriff auf
+            den Rest der Anwendung) - z. B. zum Verschicken an Familie oder Freunde.</p>
+
+        <form method="post">
+            <input type="hidden" name="id" value="<?= (int) $id ?>">
+            <button type="submit" name="aktion" value="share_link_erstellen">Link zum Teilen erstellen</button>
+        </form>
+
+    <?php else: ?>
+
+        <?php
+            $shareSchema = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $shareBasispfad = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+            $shareUrl = $shareSchema . '://' . $_SERVER['HTTP_HOST'] . $shareBasispfad
+                . '/share.php?token=' . urlencode($person['share_token']);
+        ?>
+
+        <label for="share_link">Link zum Teilen (Text markieren und kopieren):</label>
+        <input type="text" id="share_link" value="<?= htmlspecialchars($shareUrl) ?>" readonly>
+
+        <form method="post">
+            <input type="hidden" name="id" value="<?= (int) $id ?>">
+            <button type="submit" name="aktion" value="share_link_erstellen">Link neu generieren (alter Link wird ungültig)</button>
+        </form>
+
     <?php endif; ?>
 
     <a href="person-anzeigen.php">Zurück zur Personenübersicht</a>

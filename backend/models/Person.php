@@ -88,6 +88,51 @@ class Person
         ];
     }
 
+    /**
+     * Erzeugt (bzw. erneuert) den Zugriffsschluessel fuer den oeffentlichen Share-Link dieser
+     * Person (frontend/share.php?token=...). Ein erneuter Aufruf ueberschreibt einen bereits
+     * bestehenden Token und macht damit automatisch jeden zuvor verteilten Link ungueltig -
+     * es gibt bewusst nur EINEN Link pro Person, keine mehreren, einzeln widerrufbaren Links.
+     * 16 zufaellige Bytes (32 Hex-Zeichen) sind der einzige Zugriffsschutz auf diese Seite, da
+     * sie oeffentlich ohne Login erreichbar sein muss - deshalb kryptografisch sicherer Zufall
+     * (random_bytes()) statt z. B. einer fortlaufenden ID.
+     *
+     * @return string|null Der neue Token, oder null, wenn die Person nicht existiert.
+     */
+    public static function shareTokenGenerieren(int $id): ?string
+    {
+        if (self::finden($id) === null) {
+            return null;
+        }
+
+        $token = bin2hex(random_bytes(16));
+
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare('UPDATE personen SET share_token = :token WHERE id = :id');
+        $stmt->execute(['token' => $token, 'id' => $id]);
+
+        return $token;
+    }
+
+    /**
+     * Findet die Person zu einem Share-Token - Gegenstueck zu shareTokenGenerieren(), genutzt
+     * von frontend/share.php. Liefert null sowohl bei leerem/unbekanntem Token als auch bei
+     * keiner Person (kein Unterschied in der Fehlermeldung noetig/gewollt).
+     */
+    public static function findenPerShareToken(string $token): ?array
+    {
+        if ($token === '') {
+            return null;
+        }
+
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare('SELECT * FROM personen WHERE share_token = :token');
+        $stmt->execute(['token' => $token]);
+        $person = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $person !== false ? $person : null;
+    }
+
     public static function loeschen(int $id): bool
     {
         if (self::finden($id) === null) {

@@ -189,4 +189,44 @@ final class PersonTest extends ModelTestCase
         $this->assertSame('Bitte einen Namen angeben.', $fehler[0]);
         $this->assertSame('Bitte ein Geburtsdatum angeben.', $fehler[1]);
     }
+
+    public function testShareTokenGenerierenSetztTokenUndFindenPerShareTokenFindetPerson(): void
+    {
+        Person::erstellen('Anna', '2000-01-01', null, null);
+        $id = (int) $this->findePersonNachName('Anna')['id'];
+        $this->assertNull(Person::finden($id)['share_token']);
+
+        $token = Person::shareTokenGenerieren($id);
+
+        $this->assertNotNull($token);
+        $this->assertSame(32, strlen($token));
+        $this->assertSame($token, Person::finden($id)['share_token']);
+
+        $gefunden = Person::findenPerShareToken($token);
+        $this->assertSame($id, (int) $gefunden['id']);
+    }
+
+    public function testShareTokenGenerierenGibtNullZurueckWennPersonNichtExistiert(): void
+    {
+        $this->assertNull(Person::shareTokenGenerieren(999));
+    }
+
+    public function testShareTokenNeuGenerierenMachtAltenTokenUngueltig(): void
+    {
+        Person::erstellen('Anna', '2000-01-01', null, null);
+        $id = (int) $this->findePersonNachName('Anna')['id'];
+
+        $ersterToken = Person::shareTokenGenerieren($id);
+        $zweiterToken = Person::shareTokenGenerieren($id);
+
+        $this->assertNotSame($ersterToken, $zweiterToken);
+        $this->assertNull(Person::findenPerShareToken($ersterToken));
+        $this->assertSame($id, (int) Person::findenPerShareToken($zweiterToken)['id']);
+    }
+
+    public function testFindenPerShareTokenGibtNullZurueckBeiLeeremOderUnbekanntemToken(): void
+    {
+        $this->assertNull(Person::findenPerShareToken(''));
+        $this->assertNull(Person::findenPerShareToken('unbekannter-token'));
+    }
 }
