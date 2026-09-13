@@ -3,8 +3,6 @@ require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 
-
-
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
 if (!$id) {
@@ -75,25 +73,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($aktion === 'vergangen_machen') {
-    $zielWert = trim($_POST['vergangen_anlass'] ?? '');
-    $datum = trim($_POST['vergangen_datum'] ?? '');
+        $zielWert = trim($_POST['vergangen_anlass'] ?? '');
+        $datum = trim($_POST['vergangen_datum'] ?? '');
 
-    if ($zielWert === 'geburtstag') {
-        $erfolg = Geschenkidee::vergangenMachenFuerGeburtstag($id, $datum);
-    } else {
-        $anlassId = filter_var($zielWert, FILTER_VALIDATE_INT);
-        $erfolg = $anlassId
-            ? Geschenkidee::vergangenMachen($id, $anlassId, $datum)
-            : false;
+        if ($zielWert === 'geburtstag') {
+            $erfolg = Geschenkidee::vergangenMachenFuerGeburtstag($id, $datum);
+        } else {
+            $anlassId = filter_var($zielWert, FILTER_VALIDATE_INT);
+            $erfolg = $anlassId
+                ? Geschenkidee::vergangenMachen($id, $anlassId, $datum)
+                : false;
+        }
+
+        if ($erfolg) {
+            header('Location: idee-bearbeiten.php?id=' . $id);
+            exit;
+        }
+
+        $fehler[] = 'Bitte einen gültigen Anlass und ein Datum in der Vergangenheit angeben.';
     }
-
-    if ($erfolg) {
-        header('Location: idee-bearbeiten.php?id=' . $id);
-        exit;
-    }
-
-    $fehler[] = 'Bitte einen gültigen Anlass und ein Datum in der Vergangenheit angeben.';
-}
 
     if ($aktion === 'speichern') {
         $personId = trim($_POST['person'] ?? '');
@@ -110,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ));
 
         $person = $personId !== '' ? Person::finden((int) $personId) : null;
-        $fehler = Geschenkidee::validiereEingabe($person, $text, $link, $bildLink);
+        $fehler = Geschenkidee::validiereEingabe($person, $text, $link, $bildLink, $offeneAufgaben);
 
         if (empty($fehler)) {
             Geschenkidee::aktualisieren(
@@ -200,19 +198,12 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
             Diese Idee ist auch für den Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?> gedacht
         </label>
         <label>
-    <input type="checkbox"
-           name="besorgt"
-           value="1"
-           <?= $besorgt ? 'checked' : '' ?>>
-    Geschenk bereits besorgt
-</label>
+            <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
+            Geschenk bereits besorgt
+        </label>
 
-<label for="offene_aufgaben">Offene Aufgaben:</label>
-<textarea
-    id="offene_aufgaben"
-    name="offene_aufgaben"
-    maxlength="1000"
-><?= htmlspecialchars($offeneAufgaben) ?></textarea>
+        <label for="offene_aufgaben">Offene Aufgaben:</label>
+        <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>
 
         <?php if ($istFest): ?>
             <p>
@@ -233,33 +224,33 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
         <?php if (!$festIstVergangen): ?>
 
-    <h3>Als vergangenes Geschenk dokumentieren</h3>
+            <h3>Als vergangenes Geschenk dokumentieren</h3>
 
-    <label for="vergangen_anlass">Anlass:</label>
-    <select id="vergangen_anlass" name="vergangen_anlass">
-        <option value="">Anlass auswählen</option>
-        <option value="geburtstag">
-            Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?>
-        </option>
+            <label for="vergangen_anlass">Anlass:</label>
+            <select id="vergangen_anlass" name="vergangen_anlass">
+                <option value="">Anlass auswählen</option>
+                <option value="geburtstag">
+                    Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?>
+                </option>
 
-        <?php foreach ($anlaesse as $anlass): ?>
-            <option value="<?= (int) $anlass['id'] ?>">
-                <?= htmlspecialchars($anlass['name']) ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
+                <?php foreach ($anlaesse as $anlass): ?>
+                    <option value="<?= (int) $anlass['id'] ?>">
+                        <?= htmlspecialchars($anlass['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
 
-    <label for="vergangen_datum">Geschenkt am:</label>
-    <input type="date"
-           id="vergangen_datum"
-           name="vergangen_datum"
-           max="<?= htmlspecialchars((new DateTimeImmutable('yesterday'))->format('Y-m-d')) ?>">
+            <label for="vergangen_datum">Geschenkt am:</label>
+            <input type="date"
+                   id="vergangen_datum"
+                   name="vergangen_datum"
+                   max="<?= htmlspecialchars((new DateTimeImmutable('yesterday'))->format('Y-m-d')) ?>">
 
-    <button type="submit" name="aktion" value="vergangen_machen">
-        Als vergangenes Geschenk speichern
-    </button>
+            <button type="submit" name="aktion" value="vergangen_machen">
+                Als vergangenes Geschenk speichern
+            </button>
 
-<?php endif; ?>
+        <?php endif; ?>
 
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
 

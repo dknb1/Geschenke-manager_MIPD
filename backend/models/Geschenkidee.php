@@ -47,102 +47,68 @@ class Geschenkidee
      *                             oder ganz ohne Anlass gedacht sein kann
      */
     public static function erstellen(
-    int $personId,
-    ?string $text,
-    ?string $link,
-    ?string $bildLink,
-    array $anlassIds = [],
-    bool $fuerGeburtstag = false,
-    bool $besorgt = false,
-    ?string $offeneAufgaben = null
-): void
-{
-    $pdo = Datenbank::verbinden();
+        int $personId,
+        ?string $text,
+        ?string $link,
+        ?string $bildLink,
+        array $anlassIds = [],
+        bool $fuerGeburtstag = false,
+        bool $besorgt = false,
+        ?string $offeneAufgaben = null
+    ): void {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'INSERT INTO geschenkideen (person_id, text, link, bild_link, fuer_geburtstag, besorgt, offene_aufgaben)
+             VALUES (:person_id, :text, :link, :bild_link, :fuer_geburtstag, :besorgt, :offene_aufgaben)'
+        );
+        $stmt->execute([
+            'person_id' => $personId,
+            'text' => $text,
+            'link' => $link,
+            'bild_link' => $bildLink,
+            'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
+            'besorgt' => $besorgt ? 1 : 0,
+            'offene_aufgaben' => $offeneAufgaben,
+        ]);
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO geschenkideen (
-            person_id,
-            text,
-            link,
-            bild_link,
-            fuer_geburtstag,
-            besorgt,
-            offene_aufgaben
-        )
-        VALUES (
-            :person_id,
-            :text,
-            :link,
-            :bild_link,
-            :fuer_geburtstag,
-            :besorgt,
-            :offene_aufgaben
-        )'
-    );
-
-    $stmt->execute([
-        'person_id' => $personId,
-        'text' => $text,
-        'link' => $link,
-        'bild_link' => $bildLink,
-        'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
-        'besorgt' => $besorgt ? 1 : 0,
-        'offene_aufgaben' => $offeneAufgaben,
-    ]);
-
-    self::anlaesseVerknuepfen(
-        $pdo,
-        (int) $pdo->lastInsertId(),
-        $anlassIds
-    );
-}
+        self::anlaesseVerknuepfen($pdo, (int) $pdo->lastInsertId(), $anlassIds);
+    }
 
     /**
      * @param int[] $anlassIds
      */
-public static function aktualisieren(
-    int $id,
-    int $personId,
-    ?string $text,
-    ?string $link,
-    ?string $bildLink,
-    array $anlassIds = [],
-    bool $fuerGeburtstag = false,
-    bool $besorgt = false,
-    ?string $offeneAufgaben = null
-): void
-{
-    $pdo = Datenbank::verbinden();
+    public static function aktualisieren(
+        int $id,
+        int $personId,
+        ?string $text,
+        ?string $link,
+        ?string $bildLink,
+        array $anlassIds = [],
+        bool $fuerGeburtstag = false,
+        bool $besorgt = false,
+        ?string $offeneAufgaben = null
+    ): void {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'UPDATE geschenkideen
+             SET person_id = :person_id, text = :text, link = :link, bild_link = :bild_link,
+                 fuer_geburtstag = :fuer_geburtstag, besorgt = :besorgt, offene_aufgaben = :offene_aufgaben
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'person_id' => $personId,
+            'text' => $text,
+            'link' => $link,
+            'bild_link' => $bildLink,
+            'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
+            'besorgt' => $besorgt ? 1 : 0,
+            'offene_aufgaben' => $offeneAufgaben,
+            'id' => $id,
+        ]);
 
-    $stmt = $pdo->prepare(
-        'UPDATE geschenkideen
-         SET person_id = :person_id,
-             text = :text,
-             link = :link,
-             bild_link = :bild_link,
-             fuer_geburtstag = :fuer_geburtstag,
-             besorgt = :besorgt,
-             offene_aufgaben = :offene_aufgaben
-         WHERE id = :id'
-    );
+        self::anlaesseVerknuepfen($pdo, $id, $anlassIds);
+    }
 
-    $stmt->execute([
-        'person_id' => $personId,
-        'text' => $text,
-        'link' => $link,
-        'bild_link' => $bildLink,
-        'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
-        'besorgt' => $besorgt ? 1 : 0,
-        'offene_aufgaben' => $offeneAufgaben,
-        'id' => $id,
-    ]);
-
-    self::anlaesseVerknuepfen(
-        $pdo,
-        $id,
-        $anlassIds
-    );
-}
     /**
      * Wandelt die Idee in ein "festes" Geschenk fuer $anlassId um (Idee->Geschenk-Umwandlung,
      * Aufgabenstellung: "inkl. Anlass und Datum"). Das Datum wird HIER eingefroren
@@ -206,72 +172,83 @@ public static function aktualisieren(
             'id' => $id,
         ]);
     }
+    /**
+     * Erfasst ein bereits ausgehaendigtes Geschenk direkt rueckwirkend (Backfill historischer
+     * Daten) - im Unterschied zu festMachen() akzeptiert diese Methode NUR ein Datum in der
+     * Vergangenheit und setzt zusaetzlich besorgt = 1, da ein bereits vergangenes Geschenk
+     * zwangslaeufig schon besorgt wurde. Fuer zukuenftige Planung weiterhin festMachen()
+     * verwenden - beide schreiben dieselben geschenk_*-Felder und schliessen sich damit
+     * gegenseitig aus.
+     *
+     * @return bool false, wenn der Anlass nicht existiert oder $datum kein gueltiges,
+     *              bereits vergangenes Datum im Format Y-m-d ist
+     */
     public static function vergangenMachen(int $id, int $anlassId, string $datum): bool
-{
-    $anlass = Anlass::finden($anlassId);
-    $geschenkDatum = DateTimeImmutable::createFromFormat('Y-m-d', $datum);
+    {
+        $anlass = Anlass::finden($anlassId);
+        $geschenkDatum = DateTimeImmutable::createFromFormat('Y-m-d', $datum);
 
-    if ($anlass === null
-        || $geschenkDatum === false
-        || $geschenkDatum->format('Y-m-d') !== $datum
-        || $geschenkDatum >= new DateTimeImmutable('today')) {
-        return false;
+        if ($anlass === null
+            || $geschenkDatum === false
+            || $geschenkDatum->format('Y-m-d') !== $datum
+            || $geschenkDatum >= new DateTimeImmutable('today')) {
+            return false;
+        }
+
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'UPDATE geschenkideen
+             SET geschenk_anlass_id = :anlass_id, geschenk_fuer_geburtstag = 0,
+                 geschenk_datum = :geschenk_datum, besorgt = 1
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'anlass_id' => $anlassId,
+            'geschenk_datum' => $datum,
+            'id' => $id,
+        ]);
+
+        return true;
     }
 
-    $pdo = Datenbank::verbinden();
-    $stmt = $pdo->prepare(
-        'UPDATE geschenkideen
-         SET geschenk_anlass_id = :anlass_id,
-             geschenk_fuer_geburtstag = 0,
-             geschenk_datum = :geschenk_datum,
-             besorgt = 1
-         WHERE id = :id'
-    );
+    /**
+     * Gegenstueck zu vergangenMachen() fuer den Geburtstag der Person - analog zum Verhaeltnis
+     * von festMachenFuerGeburtstag() zu festMachen().
+     *
+     * @return bool false, wenn die Idee oder die zugehoerige Person nicht existiert, oder
+     *              $datum kein gueltiges, bereits vergangenes Datum im Format Y-m-d ist
+     */
+    public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bool
+    {
+        $idee = self::finden($id);
+        $geschenkDatum = DateTimeImmutable::createFromFormat('Y-m-d', $datum);
 
-    $stmt->execute([
-        'anlass_id' => $anlassId,
-        'geschenk_datum' => $datum,
-        'id' => $id,
-    ]);
+        if ($idee === null
+            || $geschenkDatum === false
+            || $geschenkDatum->format('Y-m-d') !== $datum
+            || $geschenkDatum >= new DateTimeImmutable('today')) {
+            return false;
+        }
 
-    return true;
-}
+        $person = Person::finden((int) $idee['person_id']);
+        if ($person === null) {
+            return false;
+        }
 
-public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bool
-{
-    $idee = self::finden($id);
-    $geschenkDatum = DateTimeImmutable::createFromFormat('Y-m-d', $datum);
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare(
+            'UPDATE geschenkideen
+             SET geschenk_anlass_id = NULL, geschenk_fuer_geburtstag = 1,
+                 geschenk_datum = :geschenk_datum, besorgt = 1
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'geschenk_datum' => $datum,
+            'id' => $id,
+        ]);
 
-    if ($idee === null
-        || $geschenkDatum === false
-        || $geschenkDatum->format('Y-m-d') !== $datum
-        || $geschenkDatum >= new DateTimeImmutable('today')) {
-        return false;
+        return true;
     }
-
-    $person = Person::finden((int) $idee['person_id']);
-
-    if ($person === null) {
-        return false;
-    }
-
-    $pdo = Datenbank::verbinden();
-    $stmt = $pdo->prepare(
-        'UPDATE geschenkideen
-         SET geschenk_anlass_id = NULL,
-             geschenk_fuer_geburtstag = 1,
-             geschenk_datum = :geschenk_datum,
-             besorgt = 1
-         WHERE id = :id'
-    );
-
-    $stmt->execute([
-        'geschenk_datum' => $datum,
-        'id' => $id,
-    ]);
-
-    return true;
-}
 
     /**
      * Trennt die Ideen einer Person in "aktuell" (noch offen oder fest fuer einen kommenden
@@ -327,6 +304,68 @@ public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bo
                 return (int) $idee['fuer_geburtstag'] === 1;
             }
         ));
+    }
+
+    /**
+     * Fortschritt pro Person fuer einen einzelnen Anlass (aktuell nur fuer den Weihnachtsstatus
+     * in der Benachrichtigungsglocke genutzt, siehe navbar.php) - Anzahl zugeordneter Ideen,
+     * davon "besorgt" markierte, sowie alle hinterlegten offenen Aufgaben. Zaehlt sowohl lose
+     * zugeordnete (anlaesse()) als auch fest zugeordnete Ideen, deren geschenk_datum noch
+     * nicht vergangen ist - dieselbe Fest/Lose-Unterscheidung wie in
+     * anlassNamenInklGeburtstag().
+     *
+     * @return array<int, array{person: string, ideen: int, besorgt: int, offene_aufgaben: string[]}>
+     */
+    public static function statusNachPersonFuerAnlass(int $anlassId, ?DateTimeImmutable $heute = null): array
+    {
+        $heute ??= new DateTimeImmutable('today');
+        $statusNachPerson = [];
+
+        foreach (self::alle() as $idee) {
+            $istFest = self::istFest($idee);
+
+            if ($istFest) {
+                $istFuerAnlass = (int) ($idee['geschenk_anlass_id'] ?? 0) === $anlassId;
+            } else {
+                $loseAnlassIds = array_map('intval', array_column(self::anlaesse((int) $idee['id']), 'id'));
+                $istFuerAnlass = in_array($anlassId, $loseAnlassIds, true);
+            }
+
+            if (!$istFuerAnlass) {
+                continue;
+            }
+
+            $istVergangen = $istFest
+                && !empty($idee['geschenk_datum'])
+                && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
+
+            if ($istVergangen) {
+                continue;
+            }
+
+            $personId = (int) $idee['person_id'];
+
+            if (!isset($statusNachPerson[$personId])) {
+                $statusNachPerson[$personId] = [
+                    'person' => $idee['person_name'],
+                    'ideen' => 0,
+                    'besorgt' => 0,
+                    'offene_aufgaben' => [],
+                ];
+            }
+
+            $statusNachPerson[$personId]['ideen']++;
+
+            if ((int) ($idee['besorgt'] ?? 0) === 1) {
+                $statusNachPerson[$personId]['besorgt']++;
+            }
+
+            if (!empty($idee['offene_aufgaben'])) {
+                $statusNachPerson[$personId]['offene_aufgaben'][] = trim($idee['offene_aufgaben']);
+            }
+        }
+
+        return array_values($statusNachPerson);
     }
 
     /**
@@ -513,8 +552,10 @@ public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bo
      *
      * @param ?array $person Bereits aufgeloeste Person (Person::finden()) oder null, falls
      *                       keine/keine gueltige Person ausgewaehlt wurde
+     * @param string $offeneAufgaben Freitext zu noch offenen Aufgaben (optional, gleiche
+     *                               Regeln wie $text - siehe istGueltigerText())
      */
-    public static function validiereEingabe(?array $person, string $text, string $link, string $bildLink): array
+    public static function validiereEingabe(?array $person, string $text, string $link, string $bildLink, string $offeneAufgaben = ''): array
     {
         $fehler = [];
 
@@ -528,6 +569,10 @@ public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bo
 
         if (!self::istGueltigerText($text)) {
             $fehler[] = 'Die Idee enthält nicht erlaubte Inhalte oder ist zu lang (max. 1000 Zeichen).';
+        }
+
+        if (!self::istGueltigerText($offeneAufgaben)) {
+            $fehler[] = 'Die offenen Aufgaben enthalten nicht erlaubte Inhalte oder sind zu lang (max. 1000 Zeichen).';
         }
 
         if (!self::istGueltigeUrl($link)) {

@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ));
 
     $person = $personId !== '' ? Person::finden((int) $personId) : null;
-    $fehler = Geschenkidee::validiereEingabe($person, $text, $link, $bildLink);
+    $fehler = Geschenkidee::validiereEingabe($person, $text, $link, $bildLink, $offeneAufgaben);
 
     if (empty($fehler)) {
         Geschenkidee::erstellen(
@@ -106,17 +106,12 @@ $ideen = Geschenkidee::alle();
         </label>
 
         <label>
-    <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
-    Geschenk bereits besorgt
-</label>
+            <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
+            Geschenk bereits besorgt
+        </label>
 
-<label for="offene_aufgaben">Offene Aufgaben:</label>
-<textarea
-    id="offene_aufgaben"
-    name="offene_aufgaben"
-    maxlength="1000"
-><?= htmlspecialchars($offeneAufgaben) ?></textarea>
-
+        <label for="offene_aufgaben">Offene Aufgaben:</label>
+        <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>
 
         <button type="submit">Idee speichern</button>
 

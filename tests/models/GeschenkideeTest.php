@@ -425,6 +425,27 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertContains('Bitte einen gültigen Link angeben (z. B. https://...).', $fehler);
     }
 
+    public function testValidiereEingabeLehntZuLangeOffeneAufgabenAb(): void
+    {
+        $person = ['id' => 1, 'name' => 'Anna'];
+
+        $fehler = Geschenkidee::validiereEingabe($person, 'Text', '', '', str_repeat('a', 1001));
+
+        $this->assertContains(
+            'Die offenen Aufgaben enthalten nicht erlaubte Inhalte oder sind zu lang (max. 1000 Zeichen).',
+            $fehler
+        );
+    }
+
+    public function testValidiereEingabeAkzeptiertLeereOffeneAufgaben(): void
+    {
+        $person = ['id' => 1, 'name' => 'Anna'];
+
+        $fehler = Geschenkidee::validiereEingabe($person, 'Text', '', '');
+
+        $this->assertSame([], $fehler);
+    }
+
     public function testSortiereAktuellUndVergangenTrenntNachGeschenkDatum(): void
     {
         $heute = new DateTimeImmutable('2026-09-12');
@@ -486,5 +507,145 @@ final class GeschenkideeTest extends ModelTestCase
         $bekannt = Geschenkidee::bekannteIdeenFuerGeburtstag($personId, $einJahrSpaeter);
 
         $this->assertSame([], $bekannt);
+    }
+
+    public function testVergangenMachenSetztFelderBeiGueltigemVergangenemDatum(): void
+    {
+        $gestern = (new DateTimeImmutable('yesterday'))->format('Y-m-d');
+        $personId = $this->testPersonAnlegen('Max');
+        Anlass::erstellen('Hochzeit', '2026-12-24', false, []);
+        $anlassId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        $erfolg = Geschenkidee::vergangenMachen($id, $anlassId, $gestern);
+
+        $this->assertTrue($erfolg);
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertSame($anlassId, (int) $aktualisiert['geschenk_anlass_id']);
+        $this->assertSame(0, (int) $aktualisiert['geschenk_fuer_geburtstag']);
+        $this->assertSame($gestern, $aktualisiert['geschenk_datum']);
+        $this->assertSame(1, (int) $aktualisiert['besorgt']);
+    }
+
+    public function testVergangenMachenLehntZukuenftigesDatumAb(): void
+    {
+        $morgen = (new DateTimeImmutable('tomorrow'))->format('Y-m-d');
+        $personId = $this->testPersonAnlegen('Max');
+        Anlass::erstellen('Hochzeit', '2026-12-24', false, []);
+        $anlassId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        $this->assertFalse(Geschenkidee::vergangenMachen($id, $anlassId, $morgen));
+        $this->assertNull(Geschenkidee::finden($id)['geschenk_anlass_id']);
+    }
+
+    public function testVergangenMachenLehntUngueltigesDatumUndUnbekanntenAnlassAb(): void
+    {
+        $gestern = (new DateTimeImmutable('yesterday'))->format('Y-m-d');
+        $personId = $this->testPersonAnlegen('Max');
+        Anlass::erstellen('Hochzeit', '2026-12-24', false, []);
+        $anlassId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        // Kalendarisch ungueltiges Datum (30. Februar gibt es nicht).
+        $this->assertFalse(Geschenkidee::vergangenMachen($id, $anlassId, '2026-02-30'));
+        // Anlass existiert nicht.
+        $this->assertFalse(Geschenkidee::vergangenMachen($id, 999999, $gestern));
+    }
+
+    public function testVergangenMachenFuerGeburtstagSetztFelderBeiGueltigemVergangenemDatum(): void
+    {
+        $gestern = (new DateTimeImmutable('yesterday'))->format('Y-m-d');
+        $personId = $this->testPersonAnlegen('Max');
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        $erfolg = Geschenkidee::vergangenMachenFuerGeburtstag($id, $gestern);
+
+        $this->assertTrue($erfolg);
+        $aktualisiert = Geschenkidee::finden($id);
+        $this->assertNull($aktualisiert['geschenk_anlass_id']);
+        $this->assertSame(1, (int) $aktualisiert['geschenk_fuer_geburtstag']);
+        $this->assertSame($gestern, $aktualisiert['geschenk_datum']);
+        $this->assertSame(1, (int) $aktualisiert['besorgt']);
+    }
+
+    public function testVergangenMachenFuerGeburtstagLehntZukuenftigesDatumAb(): void
+    {
+        $morgen = (new DateTimeImmutable('tomorrow'))->format('Y-m-d');
+        $personId = $this->testPersonAnlegen('Max');
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+
+        $this->assertFalse(Geschenkidee::vergangenMachenFuerGeburtstag($id, $morgen));
+        $this->assertSame(0, (int) Geschenkidee::finden($id)['geschenk_fuer_geburtstag']);
+    }
+
+    public function testStatusNachPersonFuerAnlassGruppiertLoseUndFesteIdeenProPerson(): void
+    {
+        Anlass::erstellen('Weihnachten-Test', '2026-12-24', true, []);
+        $anlassId = (int) $this->findeAnlassNachName('Weihnachten-Test')['id'];
+
+        $annaId = $this->testPersonAnlegen('Anna');
+        Geschenkidee::erstellen($annaId, 'Buch', null, null, [$anlassId], false, true);
+        Geschenkidee::erstellen($annaId, 'Spiel', null, null, [$anlassId], false, false, 'Noch einpacken');
+
+        $maxId = $this->testPersonAnlegen('Max');
+        Geschenkidee::erstellen($maxId, 'Schal', null, null);
+        $schalId = (int) $this->findeIdeeNachText('Schal')['id'];
+        Geschenkidee::festMachen($schalId, $anlassId);
+
+        $status = Geschenkidee::statusNachPersonFuerAnlass($anlassId, new DateTimeImmutable('2026-06-01'));
+        $statusNachName = [];
+        foreach ($status as $eintrag) {
+            $statusNachName[$eintrag['person']] = $eintrag;
+        }
+
+        $this->assertSame(2, $statusNachName['Anna']['ideen']);
+        $this->assertSame(1, $statusNachName['Anna']['besorgt']);
+        $this->assertSame(['Noch einpacken'], $statusNachName['Anna']['offene_aufgaben']);
+        $this->assertSame(1, $statusNachName['Max']['ideen']);
+        $this->assertSame(0, $statusNachName['Max']['besorgt']);
+    }
+
+    public function testStatusNachPersonFuerAnlassIgnoriertIdeenFuerAndereAnlaesse(): void
+    {
+        Anlass::erstellen('Weihnachten-Test', '2026-12-24', true, []);
+        $weihnachtenId = (int) $this->findeAnlassNachName('Weihnachten-Test')['id'];
+        Anlass::erstellen('Hochzeit', '2026-08-01', false, []);
+        $hochzeitId = (int) $this->findeAnlassNachName('Hochzeit')['id'];
+
+        $personId = $this->testPersonAnlegen('Max');
+        Geschenkidee::erstellen($personId, 'Nur fuer Hochzeit', null, null, [$hochzeitId]);
+
+        $status = Geschenkidee::statusNachPersonFuerAnlass($weihnachtenId, new DateTimeImmutable('2026-06-01'));
+
+        $this->assertSame([], $status);
+    }
+
+    public function testStatusNachPersonFuerAnlassBlendetBereitsVergangeneFesteZuordnungenAus(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+        Anlass::erstellen('Vergangene Feier', '2020-01-01', false, []);
+        $anlassId = (int) $this->findeAnlassNachName('Vergangene Feier')['id'];
+
+        Geschenkidee::erstellen($personId, 'Idee', null, null);
+        $id = (int) $this->findeIdeeNachText('Idee')['id'];
+        // festMachen() wuerde einen vergangenen Anlass normalerweise ueber
+        // istGueltigerZielAnlass() ablehnen - hier direkt aufgerufen, um gezielt eine bereits
+        // vergangene feste Zuordnung zu erzeugen (analog zu den Tests oben).
+        Geschenkidee::festMachen($id, $anlassId);
+
+        $status = Geschenkidee::statusNachPersonFuerAnlass($anlassId, new DateTimeImmutable('2026-01-01'));
+
+        $this->assertSame([], $status);
     }
 }
