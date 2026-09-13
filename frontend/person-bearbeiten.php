@@ -137,6 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <p>
         <a href="idee-speichern.php?person=<?= $id ?>">Neue Geschenkidee für <?= htmlspecialchars($name) ?> anlegen</a>
+        &middot;
+        <a href="ideen-generieren.php?person=<?= $id ?>">Geschenkideen generieren lassen</a>
     </p>
 
     <?php if (empty($offeneGeschenkideen)): ?>

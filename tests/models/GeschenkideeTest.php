@@ -665,4 +665,62 @@ final class GeschenkideeTest extends ModelTestCase
 
         $this->assertSame([], $status);
     }
+
+    public function testDatengrundlageFuerGenerierungEnthaeltVergangeneUndFesteVollstaendig(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+        $gestern = (new DateTimeImmutable('yesterday'))->format('Y-m-d');
+        Anlass::erstellen('Kommender Anlass', '2099-01-01', false, []);
+        $kommenderAnlassId = (int) $this->findeAnlassNachName('Kommender Anlass')['id'];
+
+        Geschenkidee::erstellen($personId, 'Vergangene Idee', null, null);
+        $vergangeneId = (int) $this->findeIdeeNachText('Vergangene Idee')['id'];
+        Geschenkidee::vergangenMachenFuerGeburtstag($vergangeneId, $gestern);
+
+        Geschenkidee::erstellen($personId, 'Feste Idee', null, null);
+        $festeId = (int) $this->findeIdeeNachText('Feste Idee')['id'];
+        Geschenkidee::festMachen($festeId, $kommenderAnlassId);
+
+        $daten = Geschenkidee::datengrundlageFuerGenerierung($personId);
+
+        $this->assertContains('Vergangene Idee', $daten);
+        $this->assertContains('Feste Idee', $daten);
+    }
+
+    public function testDatengrundlageFuerGenerierungBegrenztOffeneIdeenAufFuenfNeueste(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+
+        for ($i = 1; $i <= 6; $i++) {
+            Geschenkidee::erstellen($personId, "Offene Idee $i", null, null);
+        }
+
+        $daten = Geschenkidee::datengrundlageFuerGenerierung($personId);
+
+        $this->assertCount(5, $daten);
+        // Alle sechs wurden im selben Sekundentakt angelegt (erstellt_am hat keine
+        // Sub-Sekunden-Aufloesung) - es zaehlt hier nur, dass genau fuenf der sechs Ideen
+        // enthalten sind, nicht welche fuenf.
+        $this->assertCount(5, array_intersect(
+            $daten,
+            ['Offene Idee 1', 'Offene Idee 2', 'Offene Idee 3', 'Offene Idee 4', 'Offene Idee 5', 'Offene Idee 6']
+        ));
+    }
+
+    public function testDatengrundlageFuerGenerierungIstLeerOhneGeschenkideen(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+
+        $this->assertSame([], Geschenkidee::datengrundlageFuerGenerierung($personId));
+    }
+
+    public function testDatengrundlageFuerGenerierungUeberspringtIdeenOhneText(): void
+    {
+        $personId = $this->testPersonAnlegen('Max');
+        Geschenkidee::erstellen($personId, null, 'https://beispiel.de', null);
+
+        $daten = Geschenkidee::datengrundlageFuerGenerierung($personId);
+
+        $this->assertSame([], $daten);
+    }
 }

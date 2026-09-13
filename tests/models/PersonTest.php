@@ -229,4 +229,38 @@ final class PersonTest extends ModelTestCase
         $this->assertNull(Person::findenPerShareToken(''));
         $this->assertNull(Person::findenPerShareToken('unbekannter-token'));
     }
+
+    public function testDarfIdeenGenerierenIstWahrOhneVorherigeGenerierung(): void
+    {
+        $person = ['ideen_generiert_am' => null];
+
+        $this->assertTrue(Person::darfIdeenGenerieren($person));
+    }
+
+    public function testDarfIdeenGenerierenLehntInnerhalbDesCooldownsAb(): void
+    {
+        $person = ['ideen_generiert_am' => '2026-01-01 12:00:00'];
+        $heute = new DateTimeImmutable('2026-01-01 12:00:30');
+
+        $this->assertFalse(Person::darfIdeenGenerieren($person, $heute));
+    }
+
+    public function testDarfIdeenGenerierenErlaubtNachAblaufDesCooldowns(): void
+    {
+        $person = ['ideen_generiert_am' => '2026-01-01 12:00:00'];
+        $heute = new DateTimeImmutable('2026-01-01 12:01:01');
+
+        $this->assertTrue(Person::darfIdeenGenerieren($person, $heute));
+    }
+
+    public function testIdeenGenerierungVermerkenSetztZeitstempel(): void
+    {
+        Person::erstellen('Anna', '2000-01-01', null, null);
+        $id = (int) $this->findePersonNachName('Anna')['id'];
+        $this->assertNull(Person::finden($id)['ideen_generiert_am']);
+
+        Person::ideenGenerierungVermerken($id);
+
+        $this->assertNotNull(Person::finden($id)['ideen_generiert_am']);
+    }
 }

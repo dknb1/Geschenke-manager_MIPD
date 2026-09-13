@@ -133,6 +133,33 @@ class Person
         return $person !== false ? $person : null;
     }
 
+    /**
+     * Eigenes, striktes Cooldown pro Person zusaetzlich zum Groq-eigenen Rate-Limit (siehe
+     * Ideengenerator) - der gemeinsame API-Key teilt sich das Limit ueber alle Personen, ein
+     * versehentliches Mehrfachklicken auf "Ideen generieren" soll das nicht unnoetig
+     * ausschoepfen.
+     */
+    private const IDEEN_GENERIERUNG_COOLDOWN_SEKUNDEN = 60;
+
+    public static function darfIdeenGenerieren(array $person, ?DateTimeImmutable $heute = null): bool
+    {
+        if (empty($person['ideen_generiert_am'])) {
+            return true;
+        }
+
+        $heute ??= new DateTimeImmutable('now');
+        $letztesMal = new DateTimeImmutable($person['ideen_generiert_am']);
+
+        return $heute->getTimestamp() - $letztesMal->getTimestamp() >= self::IDEEN_GENERIERUNG_COOLDOWN_SEKUNDEN;
+    }
+
+    public static function ideenGenerierungVermerken(int $id): void
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->prepare("UPDATE personen SET ideen_generiert_am = datetime('now') WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+    }
+
     public static function loeschen(int $id): bool
     {
         if (self::finden($id) === null) {

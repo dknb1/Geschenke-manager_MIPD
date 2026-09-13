@@ -285,6 +285,35 @@ class Geschenkidee
     }
 
     /**
+     * Beispieltexte fuer die LLM-gestuetzte Ideengenerierung (siehe Ideengenerator): ALLE
+     * bereits verschenkten und fest zugeordneten Ideen dieser Person (das eigentliche Signal,
+     * was der Person bereits geschenkt wurde bzw. schon geplant ist - bewusst ungedeckelt,
+     * nicht nur die neuesten N), ergaenzt um die 5 zuletzt angelegten noch offenen Ideen als
+     * zusaetzliche Basis, falls kaum oder keine Historie existiert (Nutzerwunsch 2026-09-13:
+     * "wenn es noch nie ein Geschenk gab, gibt es sonst keine Moeglichkeit, eine Idee zu
+     * generieren"). Liefert nur den Text (keine Bilder/Links/Personennamen) - Datensparsamkeit
+     * vor der Uebermittlung an einen externen Anbieter. Ideen ohne Text (nur Link/Bild) werden
+     * uebersprungen.
+     *
+     * @return string[]
+     */
+    public static function datengrundlageFuerGenerierung(int $personId): array
+    {
+        $sortiert = self::sortiereNachStatus(self::vonPerson($personId));
+
+        $offeneNeueste = $sortiert['offen'];
+        usort($offeneNeueste, fn (array $a, array $b) => strcmp($b['erstellt_am'], $a['erstellt_am']));
+        $offeneNeueste = array_slice($offeneNeueste, 0, 5);
+
+        $alle = array_merge($sortiert['vergangen'], $sortiert['fest'], $offeneNeueste);
+
+        return array_values(array_filter(array_map(
+            fn (array $idee) => trim((string) ($idee['text'] ?? '')),
+            $alle
+        )));
+    }
+
+    /**
      * Bereits bekannte Geschenkideen fuer den (kommenden) Geburtstag einer Person - fuer die
      * monatliche Geburtstags-Vorschau in der Benachrichtigungsglocke (siehe navbar.php).
      * Zaehlt sowohl lose "auch fuer den Geburtstag gedacht"-markierte Ideen (fuer_geburtstag)

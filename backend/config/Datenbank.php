@@ -24,6 +24,7 @@ class Datenbank
     ],
     'personen' => [
         'share_token' => 'TEXT',
+        'ideen_generiert_am' => 'TEXT',
     ],
 ];
 

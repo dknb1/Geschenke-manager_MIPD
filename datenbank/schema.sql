@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS personen (
     geschlecht TEXT,
     details TEXT,
     share_token TEXT UNIQUE,
+    -- Zeitpunkt der letzten LLM-Ideengenerierung fuer diese Person (siehe Person::
+    -- darfIdeenGenerieren()) - eigenes, striktes Cooldown zusaetzlich zum Groq-eigenen
+    -- Rate-Limit, da der gemeinsame API-Key sich das Limit ueber alle Personen teilt.
+    ideen_generiert_am TEXT,
     erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
