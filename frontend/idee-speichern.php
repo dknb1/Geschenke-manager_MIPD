@@ -39,13 +39,17 @@ $anlassIds = array_values(array_intersect(
     $gueltigeAnlassIds
 ));
 
-// Das Anlass-Popup zeigt nur dann verlaesslich die Anlaesse DIESER Person, wenn es entweder
+// Der Anlass-Dialog (<dialog open>, siehe unten) wird nur dann angezeigt, wenn er entweder
 // gerade explizit ueber den "Anlass auswählen"-Button neu geladen wurde, oder die Person schon
 // beim Seitenaufruf feststand (Direktlink von person-bearbeiten.php mit ?person=ID, siehe dort).
-// Bei jedem anderen POST (z. B. einem fehlgeschlagenen Speichern-Versuch nach Personenwechsel)
-// wird das Popup bewusst NICHT als "bereit" markiert, damit es nie versehentlich die Anlaesse
-// einer inzwischen abgewaehlten Person zeigt - ohne JavaScript kann eine Aenderung der
-// Personenauswahl sonst nicht erkannt werden.
+// <dialog open> statt popovertarget, weil sich ein popover ohne JavaScript nicht automatisch
+// nach einem Formular-Reload oeffnen laesst - <dialog open> ist dagegen ein normales,
+// deklaratives HTML-Attribut und erscheint direkt in der Serverantwort. Bei jedem anderen POST
+// (z. B. einem fehlgeschlagenen Speichern-Versuch nach Personenwechsel, oder dem "Fertig"-
+// Button im Dialog) wird der Dialog bewusst NICHT angezeigt, damit er nie versehentlich die
+// Anlaesse einer inzwischen abgewaehlten Person zeigt - ohne JavaScript kann eine Aenderung
+// der Personenauswahl sonst nicht erkannt werden. Erneutes Klicken auf "Anlass auswählen"
+// laedt dann einfach neu, diesmal mit der aktuell gewaehlten Person.
 $anlaesseGeladen = $person !== null
     && ($aktion === 'anlaesse_laden' || $_SERVER['REQUEST_METHOD'] !== 'POST');
 
@@ -105,25 +109,20 @@ $ideen = Geschenkidee::alle();
             <?php endforeach; ?>
         </select>
 
-        <?php if (!$anlaesseGeladen): ?>
+        <button type="submit" name="aktion" value="anlaesse_laden">
+            Anlass auswählen<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
+        </button>
 
-            <button type="submit" name="aktion" value="anlaesse_laden">Anlass auswählen</button>
+        <?php if ($aktion === 'anlaesse_laden' && $person === null): ?>
+            <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
+        <?php endif; ?>
 
-            <?php if ($aktion === 'anlaesse_laden' && $person === null): ?>
-                <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
-            <?php endif; ?>
+        <?php if ($anlaesseGeladen): ?>
 
-        <?php else: ?>
-
-            <button type="button" popovertarget="anlass-popover">
-                Anlass auswählen<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
-            </button>
-
-            <div id="anlass-popover" popover class="benachrichtigungs-fenster anlass-popover">
+            <dialog open class="anlass-dialog">
 
                 <div class="fenster-kopf">
                     <h3>Anlässe von <?= htmlspecialchars($person['name']) ?></h3>
-                    <button class="schliessen" type="button" popovertarget="anlass-popover" popovertargetaction="hide">×</button>
                 </div>
 
                 <?php if (empty($gueltigeAnlaesse)): ?>
@@ -137,11 +136,9 @@ $ideen = Geschenkidee::alle();
                     <?php endforeach; ?>
                 <?php endif; ?>
 
-            </div>
+                <button type="submit" name="aktion" value="anlaesse_schliessen">Fertig</button>
 
-            <?php if (!empty($personen)): ?>
-                <p class="hinweis">Andere Person gewählt? Vor dem Öffnen erneut auf "Anlass auswählen" klicken, um die Liste zu aktualisieren.</p>
-            <?php endif; ?>
+            </dialog>
 
         <?php endif; ?>
 

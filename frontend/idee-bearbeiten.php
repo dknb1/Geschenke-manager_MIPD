@@ -143,10 +143,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $personen = Person::alle();
 $aktuellePerson = Person::finden((int) $personId);
 
-// Siehe idee-speichern.php fuer die ausfuehrliche Begruendung: das Anlass-Popup gilt nur dann
-// als "bereit", wenn es entweder gerade explizit neu geladen wurde, oder die Person schon beim
-// Seitenaufruf feststand (hier: beim ersten Laden immer der Fall, da die Idee bereits eine
-// Person hat) - so zeigt es nie versehentlich die Anlaesse einer inzwischen geaenderten Person.
+// Siehe idee-speichern.php fuer die ausfuehrliche Begruendung: der <dialog open>-Anlass-Dialog
+// wird nur dann angezeigt, wenn er entweder gerade explizit neu geladen wurde, oder die Person
+// schon beim Seitenaufruf feststand (hier: beim ersten Laden immer der Fall, da die Idee
+// bereits eine Person hat) - so zeigt er nie versehentlich die Anlaesse einer inzwischen
+// geaenderten Person.
 $anlaesseGeladen = $aktuellePerson !== null
     && ($aktion === 'anlaesse_laden' || $_SERVER['REQUEST_METHOD'] !== 'POST');
 
@@ -197,25 +198,20 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
         <label>Weitere Anlässe (optional):</label>
 
-        <?php if (!$anlaesseGeladen): ?>
+        <button type="submit" name="aktion" value="anlaesse_laden">
+            Anlass auswählen<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
+        </button>
 
-            <button type="submit" name="aktion" value="anlaesse_laden">Anlass auswählen</button>
+        <?php if ($aktion === 'anlaesse_laden' && $aktuellePerson === null): ?>
+            <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
+        <?php endif; ?>
 
-            <?php if ($aktion === 'anlaesse_laden' && $aktuellePerson === null): ?>
-                <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
-            <?php endif; ?>
+        <?php if ($anlaesseGeladen): ?>
 
-        <?php else: ?>
-
-            <button type="button" popovertarget="anlass-popover">
-                Anlass auswählen<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
-            </button>
-
-            <div id="anlass-popover" popover class="benachrichtigungs-fenster anlass-popover">
+            <dialog open class="anlass-dialog">
 
                 <div class="fenster-kopf">
                     <h3>Anlässe von <?= htmlspecialchars($aktuellePerson['name']) ?></h3>
-                    <button class="schliessen" type="button" popovertarget="anlass-popover" popovertargetaction="hide">×</button>
                 </div>
 
                 <?php if (empty($gueltigeAnlaesse)): ?>
@@ -229,9 +225,9 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
                     <?php endforeach; ?>
                 <?php endif; ?>
 
-            </div>
+                <button type="submit" name="aktion" value="anlaesse_schliessen">Fertig</button>
 
-            <p class="hinweis">Andere Person gewählt? Vor dem Öffnen erneut auf "Anlass auswählen" klicken, um die Liste zu aktualisieren.</p>
+            </dialog>
 
         <?php endif; ?>
 
