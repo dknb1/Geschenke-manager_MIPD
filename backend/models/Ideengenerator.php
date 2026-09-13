@@ -80,9 +80,12 @@ class Ideengenerator
         return "Hier ist eine Liste bereits verschenkter oder geplanter Geschenke einer Person:\n"
             . $liste
             . "\n\nSchlage darauf basierend genau drei NEUE, passende Geschenkideen vor, die noch "
-            . "nicht in der Liste stehen. Antworte AUSSCHLIESSLICH mit einem JSON-Array aus genau "
-            . 'drei kurzen deutschen Stichwoertern oder Produktnamen, ohne jede weitere Erklaerung, '
-            . 'zum Beispiel ["Kopfhörer", "Kochbuch", "Wanderrucksack"].';
+            . 'nicht in der Liste stehen. Jeder Vorschlag ist ein kurzer, konkreter Produkt- oder '
+            . 'Geschenkname AUF DEUTSCH - das darf ein einzelnes Wort ODER mehrere Wörter sein '
+            . '(z. B. auch "E-Book-Reader" oder "Bluetooth-Kopfhörer"), Hauptsache kurz und konkret '
+            . 'statt einer ausführlichen Beschreibung. Antworte AUSSCHLIESSLICH mit einem JSON-Array '
+            . 'aus genau drei solchen deutschsprachigen Vorschlägen, ohne jede weitere Erklärung, '
+            . 'zum Beispiel ["Kopfhörer", "E-Book-Reader", "Wanderrucksack"].';
     }
 
     private static function anfrageSenden(string $apiKey, string $prompt): ?string
