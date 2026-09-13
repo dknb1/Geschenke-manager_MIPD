@@ -125,8 +125,13 @@ $ideen = Geschenkidee::alle();
                     <h3>Anlässe von <?= htmlspecialchars($person['name']) ?></h3>
                 </div>
 
+                <label class="anlass-checkbox">
+                    <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
+                    Geburtstag
+                </label>
+
                 <?php if (empty($gueltigeAnlaesse)): ?>
-                    <p>Für diese Person sind noch keine Anlässe hinterlegt.</p>
+                    <p>Keine weiteren Anlässe für diese Person hinterlegt.</p>
                 <?php else: ?>
                     <?php foreach ($gueltigeAnlaesse as $anlass): ?>
                         <label class="anlass-checkbox">
@@ -140,6 +145,19 @@ $ideen = Geschenkidee::alle();
 
             </dialog>
 
+        <?php else: ?>
+
+            <?php /* Solange der Dialog nicht angezeigt wird, existieren seine Checkboxen nicht
+                     im DOM und wuerden beim naechsten Submit (z. B. "Idee speichern") sonst gar
+                     nicht mitgeschickt - die bereits getroffene Auswahl ginge verloren. Als
+                     verstecktes Feld weiterreichen, bis der Dialog das naechste Mal offen ist. */ ?>
+            <?php foreach ($anlassIds as $gewaehlteAnlassId): ?>
+                <input type="hidden" name="anlass_ids[]" value="<?= (int) $gewaehlteAnlassId ?>">
+            <?php endforeach; ?>
+            <?php if ($fuerGeburtstag): ?>
+                <input type="hidden" name="fuer_geburtstag" value="1">
+            <?php endif; ?>
+
         <?php endif; ?>
 
         <label for="text">Idee / Beschreibung:</label>
@@ -150,11 +168,6 @@ $ideen = Geschenkidee::alle();
 
         <label for="bild_link">Bild (Link):</label>
         <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
-
-        <label>
-            <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
-            Diese Idee ist auch für den Geburtstag der ausgewählten Person gedacht
-        </label>
 
         <label>
             <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>

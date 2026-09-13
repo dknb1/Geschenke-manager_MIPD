@@ -214,8 +214,13 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
                     <h3>Anlässe von <?= htmlspecialchars($aktuellePerson['name']) ?></h3>
                 </div>
 
+                <label class="anlass-checkbox">
+                    <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
+                    Geburtstag
+                </label>
+
                 <?php if (empty($gueltigeAnlaesse)): ?>
-                    <p>Für diese Person sind noch keine Anlässe hinterlegt.</p>
+                    <p>Keine weiteren Anlässe für diese Person hinterlegt.</p>
                 <?php else: ?>
                     <?php foreach ($gueltigeAnlaesse as $anlass): ?>
                         <label class="anlass-checkbox">
@@ -229,6 +234,15 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
             </dialog>
 
+        <?php else: ?>
+
+            <?php foreach ($anlassIds as $gewaehlteAnlassId): ?>
+                <input type="hidden" name="anlass_ids[]" value="<?= (int) $gewaehlteAnlassId ?>">
+            <?php endforeach; ?>
+            <?php if ($fuerGeburtstag): ?>
+                <input type="hidden" name="fuer_geburtstag" value="1">
+            <?php endif; ?>
+
         <?php endif; ?>
 
         <label for="text">Idee / Beschreibung:</label>
@@ -240,10 +254,6 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
         <label for="bild_link">Bild (Link):</label>
         <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
 
-        <label>
-            <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
-            Diese Idee ist auch für den Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?> gedacht
-        </label>
         <label>
             <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
             Geschenk bereits besorgt
