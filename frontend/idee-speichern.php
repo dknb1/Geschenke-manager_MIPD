@@ -110,7 +110,7 @@ $ideen = Geschenkidee::alle();
         </select>
 
         <button type="submit" name="aktion" value="anlaesse_laden">
-            Anlass auswählen<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
+            Weitere Anlässe bearbeiten<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
         </button>
 
         <?php if ($aktion === 'anlaesse_laden' && $person === null): ?>
