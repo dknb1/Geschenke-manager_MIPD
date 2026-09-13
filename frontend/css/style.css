@@ -211,6 +211,21 @@ button:disabled { opacity: .55; cursor: default; }
 .schliessen:hover, .einstellungen-button:hover { background: #edf1f6; }
 .fehler { padding: 12px 16px; border: 1px solid #dfb0ab; border-radius: 6px; background: #fff2f0; color: #a12d25; }
 .hinweis { padding: 12px 16px; border: 1px solid var(--line); border-radius: 6px; background: #f4f6f9; color: var(--muted); }
+.debug-details { margin-top: 12px; }
+.debug-details summary { cursor: pointer; font-weight: 600; }
+.debug-details pre {
+    margin-top: 8px;
+    padding: 12px;
+    max-height: 320px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #f4f6f9;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
 .anlass-dialog {
     box-sizing: border-box;
     width: 340px;

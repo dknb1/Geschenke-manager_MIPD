@@ -57,4 +57,13 @@ final class IdeengeneratorTest extends TestCase
         $this->assertNull(Ideengenerator::antwortValidieren('["A", "", "C"]'));
         $this->assertNull(Ideengenerator::antwortValidieren('["A", 2, "C"]'));
     }
+
+    public function testLetzteAnfrageUndLetzteAntwortSindLeerOhneGeneriereAufruf(): void
+    {
+        // promptAufbauen()/antwortValidieren() rufen nie anfrageSenden() auf und duerfen die
+        // fuer die Transparenz-Anzeige (ideen-generieren.php) gedachten Werte deshalb nicht
+        // setzen - nur generiere() selbst tut das (nicht automatisiert getestet, siehe oben).
+        $this->assertNull(Ideengenerator::letzteAnfrage());
+        $this->assertNull(Ideengenerator::letzteAntwort());
+    }
 }

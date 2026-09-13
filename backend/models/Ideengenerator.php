@@ -18,6 +18,14 @@ class Ideengenerator
     private const ANZAHL_VORSCHLAEGE = 3;
 
     /**
+     * Anfrage/Antwort des zuletzt aufgerufenen generiere() - fuer die Transparenz-Anzeige auf
+     * ideen-generieren.php ("was ist im Hintergrund passiert"). Absichtlich NIE die
+     * HTTP-Header: die Anfrage enthaelt sonst den API-Key im Authorization-Header.
+     */
+    private static ?string $letzteAnfrage = null;
+    private static ?string $letzteAntwort = null;
+
+    /**
      * @param string[] $beispiele Bereits bekannte Ideen-Texte dieser Person
      * @return string[]|null Genau drei Vorschlaege, oder null bei jedem Fehler (fehlender
      *                        API-Key, Netzwerkfehler, Rate-Limit, ungueltige Antwort) - der
@@ -26,6 +34,9 @@ class Ideengenerator
      */
     public static function generiere(array $beispiele): ?array
     {
+        self::$letzteAnfrage = null;
+        self::$letzteAntwort = null;
+
         $apiKey = Env::get('GROQ_API_KEY');
         if ($apiKey === null || $apiKey === '') {
             return null;
@@ -37,6 +48,26 @@ class Ideengenerator
         }
 
         return self::antwortValidieren($inhalt);
+    }
+
+    /**
+     * Der zuletzt an Groq geschickte Request-Body (ohne HTTP-Header, siehe oben), als
+     * lesbar formatiertes JSON - oder null, wenn generiere() noch nicht/erfolglos vor dem
+     * eigentlichen Versand (z. B. fehlender API-Key) aufgerufen wurde.
+     */
+    public static function letzteAnfrage(): ?string
+    {
+        return self::$letzteAnfrage;
+    }
+
+    /**
+     * Die zuletzt von Groq empfangene Rohantwort, lesbar formatiert falls gueltiges JSON -
+     * auch bei einem Fehler gesetzt (z. B. Rate-Limit-Antwort), damit sich Fehler anhand der
+     * tatsaechlichen Antwort nachvollziehen lassen.
+     */
+    public static function letzteAntwort(): ?string
+    {
+        return self::$letzteAntwort;
     }
 
     /**
@@ -56,13 +87,14 @@ class Ideengenerator
 
     private static function anfrageSenden(string $apiKey, string $prompt): ?string
     {
-        $payload = json_encode([
+        $nutzlast = [
             'model' => self::MODELL,
             'messages' => [
                 ['role' => 'user', 'content' => $prompt],
             ],
             'temperature' => 0.8,
-        ]);
+        ];
+        self::$letzteAnfrage = json_encode($nutzlast, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         $verbindung = curl_init(self::API_URL);
         curl_setopt_array($verbindung, [
@@ -72,7 +104,7 @@ class Ideengenerator
                 'Authorization: Bearer ' . $apiKey,
                 'Content-Type: application/json',
             ],
-            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_POSTFIELDS => json_encode($nutzlast),
             CURLOPT_TIMEOUT => 15,
             // Eigenes CA-Bundle statt curl.cainfo aus der php.ini zu vertrauen - je nach
             // Hosting-Umgebung (lokal wie spaeter auf All-Inkl) ist unklar/inkonsistent, ob
@@ -85,16 +117,28 @@ class Ideengenerator
 
         $antwort = curl_exec($verbindung);
         $httpCode = curl_getinfo($verbindung, CURLINFO_HTTP_CODE);
+        $curlFehler = curl_error($verbindung);
         // Kein curl_close() noetig: seit PHP 8.0 ist ein curl-Handle ein normales Objekt
         // (CurlHandle) statt einer manuell zu schliessenden Resource, es wird automatisch per
         // Garbage Collection freigegeben - curl_close() ist seitdem ein wirkungsloser No-Op
         // und wird ab PHP 8.5 als deprecated gemeldet.
 
-        if ($antwort === false || $httpCode !== 200) {
+        if ($antwort === false) {
+            self::$letzteAntwort = 'Netzwerkfehler: ' . $curlFehler;
+
             return null;
         }
 
+        // Fuer die Anzeige lesbar formatieren, falls gueltiges JSON (Normalfall) - sonst die
+        // Rohantwort unveraendert zeigen (z. B. eine HTML-Fehlerseite statt JSON).
         $dekodiert = json_decode($antwort, true);
+        self::$letzteAntwort = $dekodiert !== null
+            ? json_encode($dekodiert, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            : $antwort;
+
+        if ($httpCode !== 200) {
+            return null;
+        }
 
         return $dekodiert['choices'][0]['message']['content'] ?? null;
     }

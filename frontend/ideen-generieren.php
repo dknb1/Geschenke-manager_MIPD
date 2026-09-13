@@ -25,6 +25,8 @@ if (!$person) {
 
 $fehler = null;
 $vorschlaege = null;
+$anfrageDebug = null;
+$antwortDebug = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aktion = $_POST['aktion'] ?? '';
@@ -41,6 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $fehler = 'Für diese Person sind noch keine Geschenkideen hinterlegt - lege zuerst mindestens eine Idee an.';
             } else {
                 $vorschlaege = Ideengenerator::generiere($beispiele);
+                $anfrageDebug = Ideengenerator::letzteAnfrage();
+                $antwortDebug = Ideengenerator::letzteAntwort();
 
                 if ($vorschlaege === null) {
                     // Cooldown bewusst NUR bei Erfolg setzen - ein fehlgeschlagener Versuch
@@ -132,6 +136,20 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
 
                 <button type="submit" name="aktion" value="speichern">Ausgewählte Ideen speichern</button>
             </form>
+
+        <?php endif; ?>
+
+        <?php if ($anfrageDebug !== null): ?>
+
+            <details class="debug-details">
+                <summary>Anfrage an Groq anzeigen</summary>
+                <pre><?= htmlspecialchars($anfrageDebug) ?></pre>
+            </details>
+
+            <details class="debug-details">
+                <summary>Antwort von Groq anzeigen</summary>
+                <pre><?= htmlspecialchars($antwortDebug ?? '(keine Antwort erhalten)') ?></pre>
+            </details>
 
         <?php endif; ?>
 
