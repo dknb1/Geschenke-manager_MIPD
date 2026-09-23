@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="de">
 
@@ -36,14 +38,15 @@
                 </div>
             </section>
 
-            <section class="startseite-karte">
-                <h2>Geschenkideen</h2>
-                <p>Neue Geschenkideen speichern und bereits vorhandene Ideen verwalten.</p>
+          <section class="startseite-karte">
+    <h2>Geschenkideen</h2>
+    <p>Neue Geschenkideen speichern und bereits vorhandene Ideen verwalten.</p>
 
-                <div class="startseite-aktionen">
-                    <a href="idee-speichern.php">Geschenkideen verwalten</a>
-                </div>
-            </section>
+    <div class="startseite-aktionen">
+        <a href="idee-speichern.php">Geschenkideen verwalten</a>
+        <a href="ideen-generieren.php">Geschenke generieren</a>
+    </div>
+</section>
 
             <section class="startseite-karte">
                 <h2>Gesamtübersicht</h2>
