@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
- <?php include 'includes/navbar.php'; ?>
+ <?php $navZurueck = 'anlaesse.php'; include 'includes/navbar.php'; ?>
     <h1>Neuen Anlass erstellen</h1>
 
     <?php foreach ($fehler as $meldung): ?>

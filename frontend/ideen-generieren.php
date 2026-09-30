@@ -1,4 +1,7 @@
 <?php
+// PHP-Session nur fuer den Zustimmungshinweis vor der LLM-Nutzung - bewusst session- statt
+// DB-gebunden: die Zustimmung gilt nur fuer diesen Browser/diese Sitzung, nicht dauerhaft fuer
+// alle, die die Anwendung nutzen (siehe Aenderungsprotokoll 2026-09-13).
 session_start();
 
 require_once __DIR__ . '/../backend/models/Person.php';
@@ -39,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $person !== null) {
                 $antwortDebug = Ideengenerator::letzteAntwort();
 
                 if ($vorschlaege === null) {
+                    // Cooldown bewusst NUR bei Erfolg setzen - ein fehlgeschlagener Versuch
+                    // (z. B. Netzwerkfehler, Rate-Limit) soll nicht zusaetzlich dafuer
+                    // "bestrafen", dass man gleich nochmal versuchen will.
                     $fehler = 'Die Ideengenerierung ist gerade nicht verfügbar. Bitte später erneut versuchen.';
                 } else {
                     Person::ideenGenerierungVermerken((int) $id);
@@ -76,7 +82,7 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
 
 <body>
 
-<?php include 'includes/navbar.php'; ?>
+<?php $navZurueck = $person !== null ? 'person-bearbeiten.php?id=' . (int) $id : 'index.php'; include 'includes/navbar.php'; ?>
 
 <div class="page-container">
 

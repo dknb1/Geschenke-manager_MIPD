@@ -2,18 +2,21 @@
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+
+$zurueck = Ruecksprung::ausAnfrage('person-anzeigen.php');
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
 if (!$id) {
-    header('Location: person-anzeigen.php');
+    header('Location: ' . $zurueck);
     exit;
 }
 
 $person = Person::finden($id);
 
 if (!$person) {
-    header('Location: person-anzeigen.php');
+    header('Location: ' . $zurueck);
     exit;
 }
 
@@ -36,13 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($aktion === 'loeschen') {
         Person::loeschen($id);
-        header('Location: person-anzeigen.php');
+        header('Location: ' . $zurueck);
         exit;
     }
 
     if ($aktion === 'share_link_erstellen') {
         Person::shareTokenGenerieren($id);
-        header('Location: person-bearbeiten.php?id=' . $id);
+        header('Location: ' . Ruecksprung::anhaengen('person-bearbeiten.php?id=' . $id, $zurueck));
         exit;
     }
 
@@ -61,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $geschlecht !== '' ? $geschlecht : null,
             $details !== '' ? $details : null
         );
-        header('Location: person-anzeigen.php');
+        header('Location: ' . $zurueck);
         exit;
     }
 }
@@ -80,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <body>
 
-    <?php include 'includes/navbar.php'; ?>
+    <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
 
     <h1>Person verwalten</h1>
 
@@ -110,9 +113,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <textarea id="details" name="details" rows="5" maxlength="1000"><?= htmlspecialchars($details) ?></textarea>
 
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
-        <button type="submit" name="aktion" value="loeschen">Person löschen</button>
+        <?php /* Loeschen nicht direkt, sondern erst nach Bestaetigung im Popover unten - eine
+                 Person nimmt per ON DELETE CASCADE alle ihre Geschenke und Ideen mit, das ist
+                 nicht rueckgaengig zu machen. Natives popover (wie die Glocke in der Navbar)
+                 statt JavaScript-confirm(), damit die Folgen konkret benannt werden koennen. */ ?>
+        <button type="button" popovertarget="person-loeschen-bestaetigen">Person löschen</button>
 
     </form>
+
+    <div id="person-loeschen-bestaetigen" popover class="bestaetigungs-fenster">
+        <div class="fenster-kopf">
+            <h2><?= htmlspecialchars($person['name']) ?> wirklich löschen?</h2>
+            <button class="schliessen"
+                    popovertarget="person-loeschen-bestaetigen"
+                    popovertargetaction="hide">
+                ×
+            </button>
+        </div>
+
+        <p>
+            <?php if (count($geschenkideenDieserPerson) > 0): ?>
+                Dabei werden auch <strong><?= count($geschenkideenDieserPerson) ?>
+                <?= count($geschenkideenDieserPerson) === 1 ? 'Geschenk bzw. Idee' : 'Geschenke und Ideen' ?></strong>
+                dieser Person gelöscht.
+            <?php endif; ?>
+            <?php if (!empty($person['share_token'])): ?>
+                Der Link zum Teilen wird ungültig.
+            <?php endif; ?>
+            Das kann nicht rückgängig gemacht werden.
+        </p>
+
+        <form method="post" class="fenster-buttons">
+            <input type="hidden" name="id" value="<?= (int) $id ?>">
+            <button type="button" popovertarget="person-loeschen-bestaetigen" popovertargetaction="hide">Abbrechen</button>
+            <button type="submit" name="aktion" value="loeschen" class="gefahr-button">Ja, endgültig löschen</button>
+        </form>
+    </div>
     <h2>Anlässe von <?= htmlspecialchars($name) ?></h2>
     <?php $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person); ?>
     <p>
@@ -124,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p>Keine weiteren Anlässe hinterlegt.</p>
     <?php else: ?>
         <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
-            <a href="anlass-bearbeiten.php?id=<?= (int) $verknuepfterAnlass['id'] ?>">
+            <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-bearbeiten.php?id=' . (int) $verknuepfterAnlass['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
                 <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
                 <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
                 <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
@@ -136,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h2>Geschenkideen für <?= htmlspecialchars($name) ?></h2>
 
     <p>
-        <a href="idee-speichern.php?person=<?= $id ?>">Neue Geschenkidee für <?= htmlspecialchars($name) ?> anlegen</a>
+        <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-speichern.php?person=' . $id, 'person-bearbeiten.php?id=' . $id)) ?>">Neue Geschenkidee für <?= htmlspecialchars($name) ?> anlegen</a>
         &middot;
         <a href="ideen-generieren.php?person=<?= $id ?>">Geschenkideen generieren lassen</a>
     </p>
@@ -148,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php foreach ($offeneGeschenkideen as $idee): ?>
                 <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
-                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
                         <?php if (!empty($idee['text'])): ?>
                             <?= htmlspecialchars($idee['text']) ?>
                         <?php endif; ?>
@@ -183,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php foreach ($festeGeschenke as $idee): ?>
                 <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
-                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
                         <?php if (!empty($idee['text'])): ?>
                             <?= htmlspecialchars($idee['text']) ?>
                         <?php endif; ?>
@@ -207,7 +243,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php foreach ($vergangeneGeschenke as $idee): ?>
                 <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
                 <li>
-                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
                         <?php if (!empty($idee['text'])): ?>
                             <?= htmlspecialchars($idee['text']) ?>
                         <?php endif; ?>
@@ -221,12 +257,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </ul>
     <?php endif; ?>
 
-    <h2>Geschenkideen für <?= htmlspecialchars($name) ?> teilen</h2>
+    <h2>Geschenke und Ideen für <?= htmlspecialchars($name) ?> teilen</h2>
 
     <?php if (empty($person['share_token'])): ?>
 
         <p>Noch kein Link erstellt. Der Link zeigt eine schlanke, eigenständige Seite mit den
-            offenen und festgelegten Geschenkideen dieser Person (ohne Login, ohne Zugriff auf
+            offenen Ideen und festgelegten Geschenken dieser Person (ohne Login, ohne Zugriff auf
             den Rest der Anwendung) - z. B. zum Verschicken an Familie oder Freunde.</p>
 
         <form method="post">
@@ -253,7 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php endif; ?>
 
-    <a href="person-anzeigen.php">Zurück zur Personenübersicht</a>
+    <a href="<?= htmlspecialchars($zurueck) ?>">Zurück</a>
 
 </body>
 

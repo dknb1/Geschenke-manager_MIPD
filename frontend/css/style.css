@@ -100,7 +100,7 @@ button:disabled { opacity: .55; cursor: default; }
     align-items: center;
     justify-content: space-between;
     background: var(--nav);
-    color: rgb(238, 229, 229);
+    color: #f6f8fb;
     border-bottom: 1px solid #31445f;
 }
 .navbar-logo {
@@ -201,6 +201,23 @@ button:disabled { opacity: .55; cursor: default; }
     color: var(--ink);
     box-shadow: 0 12px 40px rgb(29 44 66 / 16%);
 }
+/* Bestaetigungsdialog (z. B. Person loeschen) - natives popover, vom Browser mittig platziert. */
+.bestaetigungs-fenster {
+    box-sizing: border-box;
+    width: 440px;
+    max-width: calc(100vw - 32px);
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: white;
+    color: var(--ink);
+    box-shadow: 0 12px 40px rgb(29 44 66 / 16%);
+}
+.bestaetigungs-fenster::backdrop { background: rgb(29 44 66 / 35%); }
+.bestaetigungs-fenster .fenster-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; margin-top: 16px; }
+.bestaetigungs-fenster .fenster-buttons button { margin: 0; }
+.gefahr-button { background: #a12d25; border-color: #a12d25; color: white; }
+.gefahr-button:hover { background: #87241e; border-color: #87241e; }
 .fenster-kopf { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .fenster-kopf h2 { margin: 0; font-size: 1.1rem; }
 .fenster-buttons { display: flex; align-items: center; gap: 8px; }
@@ -222,6 +239,13 @@ button:disabled { opacity: .55; cursor: default; }
 .schliessen:hover, .einstellungen-button:hover { background: #edf1f6; }
 .fehler { padding: 12px 16px; border: 1px solid #dfb0ab; border-radius: 6px; background: #fff2f0; color: #a12d25; }
 .hinweis { padding: 12px 16px; border: 1px solid var(--line); border-radius: 6px; background: #f4f6f9; color: var(--muted); }
+/* Personenliste: Name links, Geburtsdatum und Alter rechts im selben Link statt als zweite Textzeile. */
+.personen-eintrag { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; }
+.personen-name { font-weight: 600; }
+.personen-info { color: var(--muted); font-size: 14px; }
+/* Weihnachtsstatus in der Glocke: Namenslisten nur aufklappbar, damit viele Personen die Glocke nicht fluten. */
+.weihnachts-details summary { padding: 6px 10px; margin: 4px 0; font-size: 14px; }
+.weihnachts-details p { margin: 6px 0; font-size: 14px; }
 .debug-details { margin-top: 12px; }
 .debug-details summary { cursor: pointer; font-weight: 600; }
 .debug-details pre {
@@ -345,7 +369,7 @@ button:disabled { opacity: .55; cursor: default; }
     .navbar-logo { font-size: 13px; gap: 8px; }
     .logo-icon { padding: 6px; font-size: 12px; }
     .navbar-right { gap: 12px; }
-    .home-button { padding: 7px 9px; font-size: 12px; }
+    .home-button, .back-button { padding: 7px 9px; font-size: 12px; white-space: nowrap; }
     .page-container { padding: 18px; }
     .startseite { padding: 0; }
     .startseite > h1 { padding-bottom: 24px; margin-bottom: 22px; }
@@ -354,6 +378,10 @@ button:disabled { opacity: .55; cursor: default; }
     .startseite-aktionen { grid-column: 1 / -1; }
     .startseite-aktionen a { padding: 11px; }
     .benachrichtigungs-fenster { top: 80px; }
+}
+/* Sehr schmale Handys: mit Zurück-Button passt der Schriftzug neben den Buttons nicht mehr. */
+@media (max-width: 380px) {
+    .logo-text { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { a, summary { transition: none; } }
 @media print {

@@ -29,7 +29,7 @@ $anlaesse = Anlass::alleInklGeburtstage();
     <?php else: ?>
         <?php foreach ($anlaesse as $anlass): ?>
             <?php if ($anlass['ist_geburtstag']): ?>
-                <a href="person-bearbeiten.php?id=<?= (int) $anlass['person_id'] ?>">
+                <a href="person-bearbeiten.php?id=<?= (int) $anlass['person_id'] ?>&amp;zurueck=anlaesse.php">
                     <?= htmlspecialchars($anlass['name']) ?> - <?= htmlspecialchars(Anlass::naechstesVorkommen($anlass)->format('d.m.Y')) ?>
                     <strong>(Geburtstag)</strong>
                 </a>

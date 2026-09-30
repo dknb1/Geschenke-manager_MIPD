@@ -4,20 +4,16 @@ require_once __DIR__ . '/../../backend/models/Anlass.php';
 require_once __DIR__ . '/../../backend/models/Einstellung.php';
 require_once __DIR__ . '/../../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../../backend/models/Person.php';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['benachrichtigung_tage'])) {
-    $navNeueTage = filter_input(INPUT_POST, 'benachrichtigung_tage', FILTER_VALIDATE_INT);
-
-    if ($navNeueTage !== false && $navNeueTage >= 0 && $navNeueTage <= 365) {
-        Einstellung::benachrichtigungTageSpeichern($navNeueTage);
-    }
-}
+require_once __DIR__ . '/../../backend/models/Ruecksprung.php';
 
 $navBenachrichtigungTage = Einstellung::benachrichtigungTage();
 $navHeute = new DateTimeImmutable('today');
 
 $navBenachrichtigungen = [];
 
+// Geburtstage bewusst nicht hier, sondern gesammelt im eigenen Abschnitt weiter unten (mit
+// bekannten Geschenkideen) - der deckt ueber Anlass::personenMitAnstehendemGeburtstag() auch
+// dasselbe Erinnerungsfenster ab, damit nichts doppelt oder gar nicht erscheint.
 foreach (Anlass::alleInklGeburtstage() as $navAnlass) {
     if ($navAnlass['ist_geburtstag']) {
         continue;
@@ -50,7 +46,14 @@ usort(
     fn($a, $b) => $a['datum'] <=> $b['datum']
 );
 
-$navWeihnachtsStatus = [];
+// Weihnachtsstatus - Fortschritt pro Person fuer den geschuetzten Anlass (aktuell nur
+// Weihnachten, siehe Anlass::geschuetzte()). Ueber den geschuetzt-Flag statt Namensvergleich
+// gefunden, damit eine spaetere Umbenennung die Erkennung nicht bricht. Die eigentliche
+// Gruppierung steckt in Geschenkidee::zusammenfassungFuerPflichtanlass() (testbar, siehe
+// GeschenkideeTest), damit hier im View keine ungetestete Fachlogik liegt. Bewusst EINE
+// Zusammenfassungszeile statt eines Eintrags pro Person - bei vielen Personen wuerde die
+// Glocke sonst von Weihnachten geflutet, Details nur aufklappbar (siehe unten).
+$navWeihnachtsStatus = null;
 $navWeihnachten = Anlass::geschuetzte()[0] ?? null;
 
 if ($navWeihnachten !== null) {
@@ -58,16 +61,24 @@ if ($navWeihnachten !== null) {
     $navWeihnachtenTage = (int) $navHeute->diff($navWeihnachtenDatum)->format('%r%a');
 
     if ($navWeihnachtenTage >= 0 && $navWeihnachtenTage <= $navBenachrichtigungTage) {
-        $navWeihnachtsStatus = Geschenkidee::statusNachPersonFuerAnlass(
+        $navZusammenfassung = Geschenkidee::zusammenfassungFuerPflichtanlass(
             (int) $navWeihnachten['id'],
             $navHeute
         );
+
+        // Ohne angelegte Personen gibt es nichts zusammenzufassen.
+        if (array_merge(...array_values($navZusammenfassung)) !== []) {
+            $navWeihnachtsStatus = $navZusammenfassung;
+        }
     }
 }
 
+// Anstehende Geburtstage inkl. bereits bekannter Geschenkideen - innerhalb der "Tage vorher"-
+// Erinnerung oder im naechsten Kalendermonat, siehe Anlass::personenMitAnstehendemGeburtstag().
+// Bereits nach Datum sortiert, daher hier kein eigenes usort() noetig.
 $navGeburtstagsVorschau = [];
 
-foreach (Anlass::personenMitGeburtstagImNaechstenMonat($navHeute) as $navPerson) {
+foreach (Anlass::personenMitAnstehendemGeburtstag($navBenachrichtigungTage, $navHeute) as $navPerson) {
     $navGeburtstagsIdeen = array_map(
         fn(array $navIdee) => !empty($navIdee['text'])
             ? $navIdee['text']
@@ -85,15 +96,10 @@ foreach (Anlass::personenMitGeburtstagImNaechstenMonat($navHeute) as $navPerson)
     ];
 }
 
-usort(
-    $navGeburtstagsVorschau,
-    fn($a, $b) => $a['datum'] <=> $b['datum']
-);
-
 $navBenachrichtigungsAnzahl =
     count($navBenachrichtigungen)
     + count($navGeburtstagsVorschau)
-    + (!empty($navWeihnachtsStatus) ? 1 : 0);
+    + ($navWeihnachtsStatus !== null ? 1 : 0);
 
 ?>
 
@@ -106,10 +112,11 @@ $navBenachrichtigungsAnzahl =
 
     <div class="navbar-right">
 
-        <?php if (basename($_SERVER['PHP_SELF'] ?? '') !== 'index.php'): ?>
-            <button type="button" class="back-button" onclick="window.history.back()">
-                ← Zurück
-            </button>
+        <?php /* $navZurueck setzt die einbindende Seite vor dem include (auf Bearbeiten-Seiten
+                 ueber Ruecksprung::ausAnfrage()) - ein echter Link statt history.back(), damit
+                 der Button auch nach Direktaufrufen und Zwischen-Redirects verlaesslich ist. */ ?>
+        <?php if (isset($navZurueck)): ?>
+            <a href="<?= htmlspecialchars($navZurueck) ?>" class="back-button">← Zurück</a>
         <?php endif; ?>
 
         <button class="glocke" popovertarget="benachrichtigungen">
@@ -221,7 +228,7 @@ $navBenachrichtigungsAnzahl =
                     <br>
 
                     <?php if (!empty($navVorschau['ideen'])): ?>
-                        Geschenkideen:
+                        Geschenke und Ideen:
                         <?= htmlspecialchars(implode(', ', $navVorschau['ideen'])) ?>
                     <?php else: ?>
                         Noch keine Geschenkidee bekannt.
@@ -234,24 +241,43 @@ $navBenachrichtigungsAnzahl =
         <?php endif; ?>
 
 
-        <?php if (!empty($navWeihnachtsStatus)): ?>
+        <?php if ($navWeihnachtsStatus !== null): ?>
 
             <h3>Weihnachtsstatus</h3>
 
-            <?php foreach ($navWeihnachtsStatus as $navStatus): ?>
+            <?php /* Kein eigener Countdown - Weihnachten steht innerhalb derselben Frist bereits
+                     unter "Anstehende Anlässe". */ ?>
+            <p class="benachrichtigungs-eintrag">
+                <strong><?= count($navWeihnachtsStatus['besorgt']) ?></strong> besorgt ·
+                <strong><?= count($navWeihnachtsStatus['offen']) ?></strong> offen ·
+                <strong><?= count($navWeihnachtsStatus['ohne_idee']) ?></strong> ohne Idee
+            </p>
 
-                <?php
-                $navStatusText = $navStatus['besorgt'] === $navStatus['ideen']
-                    ? 'Besorgt'
-                    : 'Offen';
-                ?>
+            <?php if ($navWeihnachtsStatus['offen'] === [] && $navWeihnachtsStatus['ohne_idee'] === []): ?>
 
-                <p class="benachrichtigungs-eintrag">
-                    <strong><?= htmlspecialchars($navStatus['person']) ?>:</strong>
-                    <?= $navStatusText ?>
-                </p>
+                <p class="benachrichtigungs-eintrag">Für alle Personen ist alles besorgt.</p>
 
-            <?php endforeach; ?>
+            <?php else: ?>
+
+                <details class="weihnachts-details">
+                    <summary>Wer fehlt noch?</summary>
+
+                    <?php if ($navWeihnachtsStatus['offen'] !== []): ?>
+                        <p>
+                            <strong>Offen:</strong>
+                            <?= htmlspecialchars(implode(', ', $navWeihnachtsStatus['offen'])) ?>
+                        </p>
+                    <?php endif; ?>
+
+                    <?php if ($navWeihnachtsStatus['ohne_idee'] !== []): ?>
+                        <p>
+                            <strong>Ohne Idee:</strong>
+                            <?= htmlspecialchars(implode(', ', $navWeihnachtsStatus['ohne_idee'])) ?>
+                        </p>
+                    <?php endif; ?>
+                </details>
+
+            <?php endif; ?>
 
         <?php endif; ?>
 
@@ -277,7 +303,12 @@ $navBenachrichtigungsAnzahl =
 
     </div>
 
-    <form method="post">
+    <?php /* Eigener Endpunkt statt POST an die aktuelle Seite, siehe einstellung-speichern.php. */ ?>
+    <form method="post" action="einstellung-speichern.php">
+
+        <input type="hidden"
+               name="zurueck"
+               value="<?= htmlspecialchars(Ruecksprung::aktuelleSeite($_SERVER['REQUEST_URI'] ?? '', 'index.php')) ?>">
 
         <label for="benachrichtigung_tage">
             Wie viele Tage vorher möchtest du erinnert werden?
@@ -320,10 +351,12 @@ $navBenachrichtigungsAnzahl =
 </div>
 
 <script>
+// Wird eine Seite ueber die Browser-Zuruecktaste aus dem Back-Forward-Cache wiederhergestellt,
+// zeigt sie sonst den alten Stand (z. B. eine Idee, die man gerade bearbeitet hat). Bewusst nur
+// bei event.persisted neu laden: eine per Zuruecktaste frisch geladene Seite ist ohnehin aktuell,
+// ein zusaetzlicher Reload wuerde sie nur doppelt laden.
 window.addEventListener('pageshow', function (event) {
-    const navigation = performance.getEntriesByType('navigation')[0];
-
-    if (event.persisted || (navigation && navigation.type === 'back_forward')) {
+    if (event.persisted) {
         window.location.reload();
     }
 });

@@ -347,7 +347,7 @@ class Geschenkidee
      * nicht vergangen ist - dieselbe Fest/Lose-Unterscheidung wie in
      * anlassNamenInklGeburtstag().
      *
-     * @return array<int, array{person: string, ideen: int, besorgt: int, offene_aufgaben: string[]}>
+     * @return array<int, array{person_id: int, person: string, ideen: int, besorgt: int, offene_aufgaben: string[]}>
      */
     public static function statusNachPersonFuerAnlass(int $anlassId, ?DateTimeImmutable $heute = null): array
     {
@@ -380,6 +380,7 @@ class Geschenkidee
 
             if (!isset($statusNachPerson[$personId])) {
                 $statusNachPerson[$personId] = [
+                    'person_id' => $personId,
                     'person' => $idee['person_name'],
                     'ideen' => 0,
                     'besorgt' => 0,
@@ -399,6 +400,41 @@ class Geschenkidee
         }
 
         return array_values($statusNachPerson);
+    }
+
+    /**
+     * Kompakte Zusammenfassung von statusNachPersonFuerAnlass() fuer einen Pflichtanlass, der
+     * jede Person betrifft (aktuell Weihnachten) - fuer die Benachrichtigungsglocke. Statt eines
+     * Eintrags pro Person (bei vielen Personen wuerde das die Glocke fluten und alle anderen
+     * Benachrichtigungen verdraengen) drei alphabetische Namenslisten, aus denen die Glocke
+     * eine einzelne Zeile mit Zaehlern plus einer aufklappbaren Detailliste baut. Zusaetzlich
+     * zu statusNachPersonFuerAnlass() auch die Personen, fuer die noch gar keine Idee zu diesem
+     * Anlass existiert - gerade die sind bei einem Pflichtanlass am wichtigsten.
+     *
+     * @return array{besorgt: string[], offen: string[], ohne_idee: string[]}
+     */
+    public static function zusammenfassungFuerPflichtanlass(int $anlassId, ?DateTimeImmutable $heute = null): array
+    {
+        $zusammenfassung = ['besorgt' => [], 'offen' => [], 'ohne_idee' => []];
+        $mitIdee = [];
+
+        foreach (self::statusNachPersonFuerAnlass($anlassId, $heute) as $status) {
+            $mitIdee[$status['person_id']] = true;
+            $gruppe = $status['besorgt'] === $status['ideen'] ? 'besorgt' : 'offen';
+            $zusammenfassung[$gruppe][] = $status['person'];
+        }
+
+        foreach (Person::alle() as $person) {
+            if (!isset($mitIdee[(int) $person['id']])) {
+                $zusammenfassung['ohne_idee'][] = $person['name'];
+            }
+        }
+
+        foreach ($zusammenfassung as &$namen) {
+            sort($namen, SORT_NATURAL | SORT_FLAG_CASE);
+        }
+
+        return $zusammenfassung;
     }
 
     /**

@@ -2,18 +2,23 @@
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+
+// Woher die Seite aufgerufen wurde (z. B. person-bearbeiten.php) - nach Speichern/Loeschen
+// geht es dorthin zurueck, siehe Ruecksprung.
+$zurueck = Ruecksprung::ausAnfrage('idee-speichern.php');
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
 if (!$id) {
-    header('Location: idee-speichern.php');
+    header('Location: ' . $zurueck);
     exit;
 }
 
 $idee = Geschenkidee::finden($id);
 
 if (!$idee) {
-    header('Location: idee-speichern.php');
+    header('Location: ' . $zurueck);
     exit;
 }
 
@@ -79,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($aktion === 'loeschen') {
         Geschenkidee::loeschen($id);
-        header('Location: idee-speichern.php');
+        header('Location: ' . $zurueck);
         exit;
     }
 
@@ -88,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($zielWert === 'geburtstag') {
             Geschenkidee::festMachenFuerGeburtstag($id);
-            header('Location: idee-bearbeiten.php?id=' . $id);
+            header('Location: ' . Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . $id, $zurueck));
             exit;
         }
 
@@ -97,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($zielAnlassId && in_array($zielAnlassId, $gueltigeFestAnlassIds, true)) {
             Geschenkidee::festMachen($id, $zielAnlassId);
-            header('Location: idee-bearbeiten.php?id=' . $id);
+            header('Location: ' . Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . $id, $zurueck));
             exit;
         }
 
@@ -106,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($aktion === 'offen_setzen') {
         Geschenkidee::zurueckAufOffen($id);
-        header('Location: idee-bearbeiten.php?id=' . $id);
+        header('Location: ' . Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . $id, $zurueck));
         exit;
     }
 
@@ -124,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($erfolg) {
-            header('Location: idee-bearbeiten.php?id=' . $id);
+            header('Location: ' . Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . $id, $zurueck));
             exit;
         }
 
@@ -147,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $besorgt,
                 $offeneAufgaben !== '' ? $offeneAufgaben : null
             );
-            header('Location: idee-speichern.php');
+            header('Location: ' . $zurueck);
             exit;
         }
     }
@@ -186,7 +191,7 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
 <body>
 
-    <?php include 'includes/navbar.php'; ?>
+    <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
 
     <h1>Geschenkidee bearbeiten</h1>
 
@@ -353,7 +358,7 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
     </form>
 
-    <a href="idee-speichern.php">Zurück zu den Geschenkideen</a>
+    <a href="<?= htmlspecialchars($zurueck) ?>">Zurück</a>
 
 </body>
 

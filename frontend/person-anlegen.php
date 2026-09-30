@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
- <?php include 'includes/navbar.php'; ?>
+ <?php $navZurueck = 'person-anzeigen.php'; include 'includes/navbar.php'; ?>
 
     <h1>Person anlegen</h1>
 

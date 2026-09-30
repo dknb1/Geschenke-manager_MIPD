@@ -2,6 +2,12 @@
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+
+// Nur gesetzt, wenn die Seite aus einem Kontext heraus geoeffnet wurde (z. B. "Neue
+// Geschenkidee fuer X" auf person-bearbeiten.php) - dann nach dem Speichern dorthin zurueck,
+// sonst wie bisher auf dieser Seite bleiben, um direkt die naechste Idee anzulegen.
+$zurueck = Ruecksprung::ausAnfrage('');
 
 $fehler = [];
 $aktion = $_POST['aktion'] ?? '';
@@ -67,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $aktion === 'speichern') {
             $besorgt,
             $offeneAufgaben !== '' ? $offeneAufgaben : null
         );
-        header('Location: idee-speichern.php');
+        header('Location: ' . ($zurueck !== '' ? $zurueck : 'idee-speichern.php'));
         exit;
     }
 }
@@ -89,7 +95,7 @@ $ideen = Geschenkidee::alle();
 
 <body>
 
-    <?php include 'includes/navbar.php'; ?>
+    <?php if ($zurueck !== '') { $navZurueck = $zurueck; } include 'includes/navbar.php'; ?>
 
     <h1>Geschenkidee speichern</h1>
 

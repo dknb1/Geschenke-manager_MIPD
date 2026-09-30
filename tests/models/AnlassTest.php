@@ -306,4 +306,36 @@ final class AnlassTest extends ModelTestCase
 
         $this->assertSame(['Im Januar'], $namen);
     }
+
+    public function testPersonenMitAnstehendemGeburtstagVereinigtFensterUndNaechstenMonat(): void
+    {
+        $heute = new DateTimeImmutable('2026-09-12');
+
+        // Heute - muss auftauchen (fiel frueher komplett aus der Glocke, siehe Anlass.php).
+        Person::erstellen('Heute', '1990-09-12', null, null);
+        // Noch im September, innerhalb von 7 Tagen - nur ueber das Erinnerungsfenster gefunden.
+        Person::erstellen('In fuenf Tagen', '1990-09-17', null, null);
+        // Noch im September, aber ausserhalb des Fensters - weder Fenster noch naechster Monat.
+        Person::erstellen('Ende September', '1990-09-28', null, null);
+        // Naechster Kalendermonat - unabhaengig vom Fenster enthalten.
+        Person::erstellen('Im Oktober', '1990-10-25', null, null);
+        // Uebernaechster Monat - nicht enthalten.
+        Person::erstellen('Im November', '1990-11-01', null, null);
+
+        $namen = array_column(Anlass::personenMitAnstehendemGeburtstag(7, $heute), 'name');
+
+        $this->assertSame(['Heute', 'In fuenf Tagen', 'Im Oktober'], $namen);
+    }
+
+    public function testPersonenMitAnstehendemGeburtstagGrossesFensterReichtUeberNaechstenMonatHinaus(): void
+    {
+        $heute = new DateTimeImmutable('2026-09-12');
+
+        Person::erstellen('Im November', '1990-11-01', null, null);
+        Person::erstellen('Im Januar', '1990-01-10', null, null);
+
+        $namen = array_column(Anlass::personenMitAnstehendemGeburtstag(60, $heute), 'name');
+
+        $this->assertSame(['Im November'], $namen);
+    }
 }

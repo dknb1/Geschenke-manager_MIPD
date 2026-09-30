@@ -71,6 +71,39 @@ class Anlass
     }
 
     /**
+     * Alle Personen, deren naechster Geburtstag entweder innerhalb der einstellbaren
+     * "Tage vorher"-Erinnerung liegt ODER in den naechsten Kalendermonat faellt - Quelle fuer
+     * den Geburtstags-Abschnitt der Benachrichtigungsglocke (siehe navbar.php). Beides wird
+     * bewusst vereinigt: Geburtstage werden dort nicht mehr zusaetzlich unter "Anstehende
+     * Anlaesse" gelistet, deshalb muss dieser Abschnitt auch Geburtstage im laufenden Monat
+     * (inkl. heute) abdecken, die personenMitGeburtstagImNaechstenMonat() allein nicht findet.
+     * Sortiert nach naechstem Geburtstag. $heute ist fuer Tests injizierbar.
+     */
+    public static function personenMitAnstehendemGeburtstag(int $tageVorher, ?DateTimeImmutable $heute = null): array
+    {
+        $heute ??= new DateTimeImmutable('today');
+        $fensterEnde = $heute->modify('+' . $tageVorher . ' days');
+        $imNaechstenMonat = array_column(self::personenMitGeburtstagImNaechstenMonat($heute), 'id');
+
+        $personen = array_values(array_filter(
+            Person::alle(),
+            function (array $person) use ($heute, $fensterEnde, $imNaechstenMonat) {
+                $geburtstag = self::naechstesVorkommen(Person::geburtstagAlsAnlass($person), $heute);
+                return $geburtstag <= $fensterEnde || in_array($person['id'], $imNaechstenMonat, true);
+            }
+        ));
+
+        usort(
+            $personen,
+            fn (array $a, array $b) =>
+                self::naechstesVorkommen(Person::geburtstagAlsAnlass($a), $heute)
+                <=> self::naechstesVorkommen(Person::geburtstagAlsAnlass($b), $heute)
+        );
+
+        return $personen;
+    }
+
+    /**
      * Buendelt die Validierung von Name und Datum eines Anlasses fuer erstellen()/
      * aktualisieren() in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) -
      * zentrale Stelle statt dieselbe Pruefung in anlass-erstellen.php und

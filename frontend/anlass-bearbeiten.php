@@ -1,18 +1,21 @@
 <?php
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Person.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+
+$zurueck = Ruecksprung::ausAnfrage('anlaesse.php');
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
 if (!$id) {
-    header('Location: anlaesse.php');
+    header('Location: ' . $zurueck);
     exit;
 }
 
 $anlass = Anlass::finden($id);
 
 if (!$anlass) {
-    header('Location: anlaesse.php');
+    header('Location: ' . $zurueck);
     exit;
 }
 
@@ -27,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($aktion === 'loeschen') {
         if (Anlass::loeschen($id)) {
-            header('Location: anlaesse.php');
+            header('Location: ' . $zurueck);
             exit;
         }
         $fehler[] = 'Dieser Anlass ist ein Pflichtanlass und kann nicht gelöscht werden.';
@@ -55,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($fehler)) {
             Anlass::aktualisieren($id, $name, $datum, $wiederholung === 'ja', $personIds);
-            header('Location: anlaesse.php');
+            header('Location: ' . $zurueck);
             exit;
         }
     }
@@ -74,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
- <?php include 'includes/navbar.php'; ?>
+ <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
     <h1>Anlass bearbeiten</h1>
 
     <?php foreach ($fehler as $meldung): ?>
@@ -126,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     </form>
 
-    <a href="anlaesse.php">Zurück zu meinen Anlässen</a>
+    <a href="<?= htmlspecialchars($zurueck) ?>">Zurück</a>
 
 </body>
 

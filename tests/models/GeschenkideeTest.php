@@ -723,4 +723,29 @@ final class GeschenkideeTest extends ModelTestCase
 
         $this->assertSame([], $daten);
     }
+
+    public function testZusammenfassungFuerPflichtanlassGruppiertAlleDreiFaelle(): void
+    {
+        Anlass::erstellen('Weihnachten-Test', '2026-12-24', true, []);
+        $anlassId = (int) $this->findeAnlassNachName('Weihnachten-Test')['id'];
+
+        // Alles besorgt.
+        $berta = $this->testPersonAnlegen('Berta');
+        Geschenkidee::erstellen($berta, 'Buch', null, null, [$anlassId], false, true);
+        // Eine von zwei Ideen besorgt -> noch offen.
+        $anna = $this->testPersonAnlegen('Anna');
+        Geschenkidee::erstellen($anna, 'Schal', null, null, [$anlassId], false, true);
+        Geschenkidee::erstellen($anna, 'Tee', null, null, [$anlassId]);
+        // Nur Ideen fuer einen anderen Anlass bzw. gar keine -> ohne Idee.
+        $this->testPersonAnlegen('Zoe');
+        $carl = $this->testPersonAnlegen('Carl');
+        Geschenkidee::erstellen($carl, 'Ohne Anlass', null, null);
+
+        $zusammenfassung = Geschenkidee::zusammenfassungFuerPflichtanlass($anlassId, new DateTimeImmutable('2026-06-01'));
+
+        $this->assertSame(
+            ['besorgt' => ['Berta'], 'offen' => ['Anna'], 'ohne_idee' => ['Carl', 'Zoe']],
+            $zusammenfassung
+        );
+    }
 }
