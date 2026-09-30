@@ -1,27 +1,31 @@
 <?php
 require_once __DIR__ . '/../backend/models/Person.php';
+require_once __DIR__ . '/../backend/models/Interesse.php';
 
 $fehler = [];
 $name = '';
 $geburtsdatum = '';
 $geschlecht = '';
 $details = '';
+$interessen = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $geburtsdatum = trim($_POST['geburtsdatum'] ?? '');
     $geschlecht = $_POST['geschlecht'] ?? '';
     $details = trim($_POST['details'] ?? '');
+    $interessen = Interesse::nurGueltige((array) ($_POST['interessen'] ?? []));
 
     $fehler = Person::validiereEingabe($name, $geburtsdatum, $geschlecht, $details);
 
     if (empty($fehler)) {
-        Person::erstellen(
+        $personId = Person::erstellen(
             $name,
             $geburtsdatum,
             $geschlecht !== '' ? $geschlecht : null,
             $details !== '' ? $details : null
         );
+        Interesse::fuerPersonSetzen($personId, $interessen);
         header('Location: person-anzeigen.php');
         exit;
     }
@@ -66,6 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <label for="details">Details:</label>
         <textarea id="details" name="details" rows="5" maxlength="1000"><?= htmlspecialchars($details) ?></textarea>
+
+        <?php include 'includes/interessen-auswahl.php'; ?>
 
         <button type="submit">Person speichern</button>
 

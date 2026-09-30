@@ -99,6 +99,17 @@ CREATE TABLE IF NOT EXISTS anlass_personen (
 -- die Verknuepfungszeile, nicht die jeweils andere Seite - eine Idee bleibt also erhalten,
 -- wenn der verknuepfte Anlass geloescht wird, verliert dabei nur die Anlass-Zuordnung.
 -- Setzt PRAGMA foreign_keys = ON voraus (siehe Datenbank::neueVerbindung()).
+-- Interessen einer Person als Grundlage fuer die LLM-Ideengenerierung. interesse ist ein
+-- Schluessel aus der festen Liste Interesse::KATEGORIEN (z. B. 'kochen'), bewusst KEIN Freitext:
+-- an den externen Anbieter sollen nur Werte aus einem festen Vokabular gehen, keine frei
+-- formulierten (ggf. personenbezogenen) Angaben. Deshalb auch keine eigene Kategorien-Tabelle -
+-- die Liste liegt im Code und wird beim Speichern dagegen geprueft.
+CREATE TABLE IF NOT EXISTS person_interessen (
+    person_id INTEGER NOT NULL REFERENCES personen(id) ON DELETE CASCADE,
+    interesse TEXT NOT NULL,
+    PRIMARY KEY (person_id, interesse)
+);
+
 CREATE TABLE IF NOT EXISTS geschenkidee_anlaesse (
     geschenkidee_id INTEGER NOT NULL REFERENCES geschenkideen(id) ON DELETE CASCADE,
     anlass_id INTEGER NOT NULL REFERENCES anlaesse(id) ON DELETE CASCADE,

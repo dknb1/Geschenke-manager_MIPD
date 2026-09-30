@@ -7,6 +7,8 @@ session_start();
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../backend/models/Ideengenerator.php';
+require_once __DIR__ . '/../backend/models/Interesse.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 
 $id = filter_input(INPUT_GET, 'person', FILTER_VALIDATE_INT)
     ?: filter_input(INPUT_POST, 'person', FILTER_VALIDATE_INT);
@@ -23,6 +25,16 @@ if ($id && $person === null) {
     $fehler = 'Die ausgewählte Person konnte nicht gefunden werden.';
 }
 
+// Anlass/Budget gelten nur fuer diese eine Anfrage (nicht gespeichert) und bleiben nach dem
+// Generieren ausgewaehlt. Nur Schluessel aus den festen Listen, siehe Ideengenerator.
+$anlass = $_POST['anlass'] ?? 'keiner';
+$anlass = is_string($anlass) && isset(Ideengenerator::ANLAESSE[$anlass]) ? $anlass : 'keiner';
+$budget = $_POST['budget'] ?? 'egal';
+$budget = is_string($budget) && isset(Ideengenerator::BUDGETS[$budget]) ? $budget : 'egal';
+
+$beispiele = $person !== null ? Geschenkidee::datengrundlageFuerGenerierung((int) $id) : [];
+$interessen = $person !== null ? Interesse::vonPerson((int) $id) : [];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $person !== null) {
     $aktion = $_POST['aktion'] ?? '';
 
@@ -32,12 +44,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $person !== null) {
         if (!Person::darfIdeenGenerieren($person)) {
             $fehler = 'Bitte kurz warten, bevor für diese Person erneut Ideen generiert werden.';
         } else {
-            $beispiele = Geschenkidee::datengrundlageFuerGenerierung((int) $id);
-
-            if (empty($beispiele)) {
-                $fehler = 'Für diese Person sind noch keine Geschenkideen hinterlegt - lege zuerst mindestens eine Idee an.';
+            if (empty($beispiele) && empty($interessen)) {
+                $fehler = 'Für diese Person sind weder Geschenkideen noch Interessen hinterlegt - lege zuerst eine Idee an oder wähle Interessen aus.';
             } else {
-                $vorschlaege = Ideengenerator::generiere($beispiele);
+                $vorschlaege = Ideengenerator::generiere(
+                    $beispiele,
+                    Interesse::bezeichnungen($interessen),
+                    $anlass,
+                    $budget
+                );
                 $anfrageDebug = Ideengenerator::letzteAnfrage();
                 $antwortDebug = Ideengenerator::letzteAntwort();
 
@@ -128,22 +143,56 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
 
         <?php if ($vorschlaege === null): ?>
 
+            <?php if (Ideengenerator::datengrundlageIstDuenn(count($beispiele), count($interessen))): ?>
+                <?php /* Ruecksprung zurueck auf diese Seite, damit man nach dem Speichern der
+                         Interessen direkt weitergenerieren kann (siehe Ruecksprung). */ ?>
+                <div class="hinweis">
+                    <p>
+                        Für <?= htmlspecialchars($person['name']) ?> ist noch wenig bekannt
+                        (<?= count($beispiele) ?> <?= count($beispiele) === 1 ? 'Idee' : 'Ideen' ?>, keine Interessen).
+                        Die Vorschläge werden deutlich besser, wenn du Interessen hinterlegst.
+                    </p>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('person-bearbeiten.php?id=' . (int) $id, 'ideen-generieren.php?person=' . (int) $id)) ?>">
+                        Interessen von <?= htmlspecialchars($person['name']) ?> hinterlegen
+                    </a>
+                </div>
+            <?php endif; ?>
+
             <?php if (!$zugestimmt): ?>
                 <div class="hinweis">
                     <p>
-                        Für die Ideengenerierung werden die Texte der bereits verschenkten,
+                        Für die Ideengenerierung werden folgende Angaben an den externen Anbieter
+                        <strong>Groq</strong> (Modell <code><?= htmlspecialchars(Ideengenerator::MODELL) ?></code>) übermittelt,
+                        um drei neue Vorschläge zu erhalten: die Texte der bereits verschenkten,
                         fest zugeordneten und zuletzt angelegten offenen Geschenkideen dieser
-                        Person an den externen Anbieter <strong>Groq</strong> (Modell
-                        <code>openai/gpt-oss-20b</code>) übermittelt, um drei neue Vorschläge
-                        zu erhalten. Es werden ausschließlich die Ideen-Texte übertragen -
-                        kein Personenname, keine Bilder und keine Links.
+                        Person, ihre hinterlegten Interessen-Kategorien sowie der unten gewählte
+                        Anlass und das Budget. Nicht übertragen werden Name, Geburtsdatum bzw.
+                        Alter, Geschlecht, Details, Bilder und Links.
                         Die Zustimmung gilt nur für diese Browser-Sitzung.
                     </p>
                 </div>
             <?php endif; ?>
 
-            <form method="post">
+            <form method="post" class="ideen-formular">
                 <input type="hidden" name="person" value="<?= (int) $id ?>">
+
+                <label for="anlass">Anlass:</label>
+                <select id="anlass" name="anlass">
+                    <?php foreach (Ideengenerator::ANLAESSE as $schluessel => $bezeichnung): ?>
+                        <option value="<?= htmlspecialchars($schluessel) ?>" <?= $schluessel === $anlass ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($bezeichnung) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
+                <label for="budget">Budget:</label>
+                <select id="budget" name="budget">
+                    <?php foreach (Ideengenerator::BUDGETS as $schluessel => $bezeichnung): ?>
+                        <option value="<?= htmlspecialchars($schluessel) ?>" <?= $schluessel === $budget ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($bezeichnung) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
 
                 <button type="submit" name="aktion" value="generieren">
                     <?= $zugestimmt ? 'Ideen generieren' : 'Verstanden, Ideen generieren' ?>

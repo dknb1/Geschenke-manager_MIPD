@@ -86,7 +86,9 @@ class Datenbank
      * (loeschen + neu anlegen statt Diff - die Mengen im Prototyp-Umfang sind klein). Gemeinsame
      * Grundlage fuer Anlass::personenVerknuepfen() (anlass_personen) und
      * Geschenkidee::anlaesseVerknuepfen() (geschenkidee_anlaesse), die vorher denselben
-     * DELETE+INSERT-Code jeweils eigenstaendig implementiert hatten.
+     * DELETE+INSERT-Code jeweils eigenstaendig implementiert hatten, sowie
+     * Interesse::fuerPersonSetzen() (person_interessen - dort sind die "fremden IDs" die
+     * Text-Schluessel der festen Kategorienliste statt Zahlen).
      *
      * $tabelle/$eigeneSpalte/$fremdeSpalte werden direkt in die SQL-Strings eingesetzt (keine
      * Prepared-Statement-Platzhalter fuer Tabellen-/Spaltennamen moeglich) - das ist hier
@@ -95,7 +97,7 @@ class Datenbank
      * migriereFehlendeSpalten() oben). $fremdeIds sind normale Werte und werden parametrisiert
      * gebunden.
      *
-     * @param int[] $fremdeIds
+     * @param int[]|string[] $fremdeIds
      */
     public static function ersetzeVerknuepfung(
         PDO $pdo,

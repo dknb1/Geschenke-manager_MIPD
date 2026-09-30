@@ -21,6 +21,51 @@ final class IdeengeneratorTest extends TestCase
         $this->assertStringContainsString('drei', $prompt);
     }
 
+    public function testPromptAufbauenUebernimmtInteressenAnlassUndBudget(): void
+    {
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], ['Reisen', 'Musik'], 'weihnachten', 'bis_20');
+
+        $this->assertStringContainsString('Interessen der Person: Reisen, Musik.', $prompt);
+        $this->assertStringContainsString('Anlass: Weihnachten.', $prompt);
+        $this->assertStringContainsString('Budget: bis 20 €.', $prompt);
+        $this->assertStringContainsString('- Kochbuch', $prompt);
+        // Zeilenumbrueche im Prompt immer als \n, unabhaengig von den Zeilenenden der
+        // Quelldatei (ein woertlicher Umbruch im String wuerde unter Windows zu \r\n).
+        $this->assertStringNotContainsString("\r", $prompt);
+    }
+
+    public function testAntwortValidierenVereinheitlichtGeschuetzteBindestricheUndLeerzeichen(): void
+    {
+        $vorschlaege = Ideengenerator::antwortValidieren(
+            "[\"Sushi\u{2011}Kochkurs\", \"Spotify\u{00A0}Karte\u{202F}10\u{00A0}€\", \"Buch – 100 Rezepte\"]"
+        );
+
+        $this->assertSame(['Sushi-Kochkurs', 'Spotify Karte 10 €', 'Buch – 100 Rezepte'], $vorschlaege);
+    }
+
+    public function testPromptAufbauenLaesstLeereUndUnbekannteAngabenWeg(): void
+    {
+        $prompt = Ideengenerator::promptAufbauen([], ['Lesen'], 'keiner', 'egal');
+
+        $this->assertStringNotContainsString('Anlass:', $prompt);
+        $this->assertStringNotContainsString('Budget:', $prompt);
+        $this->assertStringNotContainsString('Bereits verschenkte', $prompt);
+
+        // Manipulierte Formularwerte duerfen nicht als Freitext im Prompt landen.
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], 'Hochzeit von Anna', '999 €');
+        $this->assertStringNotContainsString('Anna', $prompt);
+        $this->assertStringNotContainsString('999', $prompt);
+    }
+
+    public function testDatengrundlageIstDuennOhneInteressenUndMitWenigenIdeen(): void
+    {
+        $this->assertTrue(Ideengenerator::datengrundlageIstDuenn(0, 0));
+        $this->assertTrue(Ideengenerator::datengrundlageIstDuenn(2, 0));
+        $this->assertFalse(Ideengenerator::datengrundlageIstDuenn(3, 0));
+        // Schon ein Interesse genuegt, auch ganz ohne Ideen.
+        $this->assertFalse(Ideengenerator::datengrundlageIstDuenn(0, 1));
+    }
+
     public function testAntwortValidierenAkzeptiertGueltigesJsonArrayMitDreiStrings(): void
     {
         $vorschlaege = Ideengenerator::antwortValidieren('["Kopfhörer", "Kochbuch", "Wanderrucksack"]');

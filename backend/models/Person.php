@@ -23,7 +23,8 @@ class Person
         return $person !== false ? $person : null;
     }
 
-    public static function erstellen(string $name, string $geburtsdatum, ?string $geschlecht, ?string $details): void
+    /** @return int ID der neu angelegten Person (z. B. um direkt ihre Interessen zu speichern) */
+    public static function erstellen(string $name, string $geburtsdatum, ?string $geschlecht, ?string $details): int
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
@@ -36,6 +37,8 @@ class Person
             'geschlecht' => $geschlecht,
             'details' => $details,
         ]);
+
+        return (int) $pdo->lastInsertId();
     }
 
     public static function aktualisieren(int $id, string $name, string $geburtsdatum, ?string $geschlecht, ?string $details): void

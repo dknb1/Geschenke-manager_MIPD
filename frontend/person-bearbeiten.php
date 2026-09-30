@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
+require_once __DIR__ . '/../backend/models/Interesse.php';
 require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 
 $zurueck = Ruecksprung::ausAnfrage('person-anzeigen.php');
@@ -25,6 +26,7 @@ $name = $person['name'];
 $geburtsdatum = $person['geburtsdatum'];
 $geschlecht = $person['geschlecht'] ?? '';
 $details = $person['details'] ?? '';
+$interessen = Interesse::vonPerson($id);
 
 $verknuepfteAnlaesse = Anlass::vonPersonInklGeschuetzte($id);
 
@@ -53,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $geburtsdatum = trim($_POST['geburtsdatum'] ?? '');
     $geschlecht = $_POST['geschlecht'] ?? '';
     $details = trim($_POST['details'] ?? '');
+    $interessen = Interesse::nurGueltige((array) ($_POST['interessen'] ?? []));
 
     $fehler = Person::validiereEingabe($name, $geburtsdatum, $geschlecht, $details);
 
@@ -64,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $geschlecht !== '' ? $geschlecht : null,
             $details !== '' ? $details : null
         );
+        Interesse::fuerPersonSetzen($id, $interessen);
         header('Location: ' . $zurueck);
         exit;
     }
@@ -111,6 +115,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <label for="details">Details:</label>
         <textarea id="details" name="details" rows="5" maxlength="1000"><?= htmlspecialchars($details) ?></textarea>
+
+        <?php include 'includes/interessen-auswahl.php'; ?>
 
         <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
         <?php /* Loeschen nicht direkt, sondern erst nach Bestaetigung im Popover unten - eine
