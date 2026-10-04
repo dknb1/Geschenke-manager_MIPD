@@ -97,6 +97,9 @@ $personen = Person::alle();
             <?php endforeach; ?>
         </select>
 
+        <?php /* Enter speichert: der erste Submit-Button im Formular ist der Standard (siehe idee-bearbeiten.php). */ ?>
+        <button type="submit" name="aktion" value="speichern" class="standard-button" tabindex="-1" aria-hidden="true">Geschenkidee speichern</button>
+
         <?php if ($aktion === 'anlaesse_laden' && $person === null): ?>
             <p class="fehler">Bitte zuerst eine Person auswählen.</p>
         <?php endif; ?>
