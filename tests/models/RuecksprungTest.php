@@ -32,6 +32,22 @@ final class RuecksprungTest extends TestCase
         ));
     }
 
+    public function testErlaubtSuchtextNurMitHarmlosenZeichen(): void
+    {
+        $this->assertTrue(Ruecksprung::istGueltig('anlaesse.php?filter=1&suche=Umzug%20M%C3%BCller'));
+        $this->assertTrue(Ruecksprung::istGueltig('anlaesse.php?suche=O%27Brien-Meier'));
+
+        foreach ([
+            'anlaesse.php?suche=%3Cscript%3E',
+            'anlaesse.php?suche=a%0d%0aSet-Cookie',
+            'anlaesse.php?suche=a%2Fb',
+            'anlaesse.php?suche=',
+            'anlaesse.php?suche=' . str_repeat('a', 101),
+        ] as $ziel) {
+            $this->assertFalse(Ruecksprung::istGueltig($ziel), $ziel);
+        }
+    }
+
     public function testLehntAlleFremdenOderManipuliertenZieleAb(): void
     {
         foreach ([

@@ -1,11 +1,6 @@
 <?php
 
-/**
- * Minimaler .env-Loader (keine Composer-Abhaengigkeit noetig fuer eine einzelne Variable) -
- * .env liegt im Projektroot, ist in .gitignore, wird beim Deployment manuell auf den Server
- * kopiert (nicht Teil des Git-Repos, siehe Betriebsdokumentation). Aktuell einziger Nutzer:
- * GROQ_API_KEY fuer die Ideengenerierung (Ideengenerator.php).
- */
+/** Liest die .env im Projektordner (aktuell nur fuer den Groq-API-Key). */
 class Env
 {
     private static ?array $werte = null;

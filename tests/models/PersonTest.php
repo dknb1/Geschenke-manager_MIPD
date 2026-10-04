@@ -190,6 +190,39 @@ final class PersonTest extends ModelTestCase
         $this->assertSame('Bitte ein Geburtsdatum angeben.', $fehler[1]);
     }
 
+    public function testNameIstVergebenIgnoriertSchreibweiseUndLeerzeichen(): void
+    {
+        Person::erstellen('Anna Krüger', '1990-01-01', null, null);
+
+        $this->assertTrue(Person::nameIstVergeben('Anna Krüger'));
+        // Umlaut in Grossbuchstaben - mit SQLite-NOCASE waere das kein Treffer.
+        $this->assertTrue(Person::nameIstVergeben('ANNA KRÜGER'));
+        $this->assertTrue(Person::nameIstVergeben('  anna   krüger '));
+        $this->assertFalse(Person::nameIstVergeben('Anna Krüger Arbeit'));
+    }
+
+    public function testNameIstVergebenUnabhaengigVomGeburtsdatum(): void
+    {
+        // Gleicher Name, anderer Geburtstag: in den Listen trotzdem nicht unterscheidbar.
+        Person::erstellen('Hannah Werner', '1995-10-31', null, null);
+
+        $fehler = Person::validiereEingabe('Hannah Werner', '2002-04-17', '', '');
+
+        $this->assertCount(1, $fehler);
+        $this->assertStringContainsString('bereits eine Person mit diesem Namen', $fehler[0]);
+    }
+
+    public function testValidiereEingabeBeimBearbeitenZaehltPersonNichtAlsDublette(): void
+    {
+        $id = Person::erstellen('Anna', '1990-01-01', null, null);
+        $andereId = Person::erstellen('Ben', '1990-01-01', null, null);
+
+        // Eigenen Namen behalten (z. B. nur Geburtsdatum geaendert) ist erlaubt ...
+        $this->assertSame([], Person::validiereEingabe('Anna', '1991-02-02', '', '', $id));
+        // ... in den Namen einer anderen Person umbenennen nicht.
+        $this->assertCount(1, Person::validiereEingabe('Anna', '1990-01-01', '', '', $andereId));
+    }
+
     public function testShareTokenGenerierenSetztTokenUndFindenPerShareTokenFindetPerson(): void
     {
         Person::erstellen('Anna', '2000-01-01', null, null);

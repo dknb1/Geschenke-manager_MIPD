@@ -38,10 +38,10 @@
 
             <section class="startseite-karte">
                 <h2>Geschenke und Ideen</h2>
-                <p>Neue Ideen speichern, vorhandene Geschenke und Ideen verwalten oder neue Ideen generieren lassen.</p>
+                <p>Neue Geschenkideen für eine Person erstellen oder Ideen generieren lassen.</p>
 
                 <div class="startseite-aktionen">
-                    <a href="idee-speichern.php">Geschenke und Ideen verwalten</a>
+                    <a href="idee-speichern.php">Geschenkidee erstellen</a>
                     <a href="ideen-generieren.php">Geschenkideen generieren</a>
                 </div>
             </section>

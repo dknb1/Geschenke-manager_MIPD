@@ -1,6 +1,5 @@
 <?php
-// Gemeinsame Interessen-Checkboxen fuer person-anlegen.php und person-bearbeiten.php.
-// Erwartet $interessen (string[] - aktuell ausgewaehlte Schluessel aus Interesse::KATEGORIEN).
+// Interessen-Haekchen fuer Person anlegen/bearbeiten. Erwartet $interessen (gewaehlte Schluessel).
 ?>
 <fieldset class="interessen-auswahl">
     <legend>Interessen (optional)</legend>

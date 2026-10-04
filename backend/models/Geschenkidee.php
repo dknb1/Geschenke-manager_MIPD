@@ -39,12 +39,7 @@ class Geschenkidee
     }
 
     /**
-     * @param int[] $anlassIds IDs der Anlaesse, zu denen diese Idee passt (kann leer sein -
-     *                         eine Idee muss nicht zwingend einem Anlass zugeordnet sein)
-     * @param bool $fuerGeburtstag Ob die Idee (zusaetzlich) fuer den Geburtstag der Person
-     *                             gedacht ist - explizit statt automatisch, da eine Idee auch
-     *                             ausschliesslich fuer einen anderen Anlass (z. B. Hochzeit)
-     *                             oder ganz ohne Anlass gedacht sein kann
+     * @param bool $fuerGeburtstag Idee ist (auch) fuer den Geburtstag gedacht - bewusst kein Automatismus.
      */
     public static function erstellen(
         int $personId,
@@ -74,9 +69,6 @@ class Geschenkidee
         self::anlaesseVerknuepfen($pdo, (int) $pdo->lastInsertId(), $anlassIds);
     }
 
-    /**
-     * @param int[] $anlassIds
-     */
     public static function aktualisieren(
         int $id,
         int $personId,
@@ -110,15 +102,8 @@ class Geschenkidee
     }
 
     /**
-     * Wandelt die Idee in ein "festes" Geschenk fuer $anlassId um (Idee->Geschenk-Umwandlung,
-     * Aufgabenstellung: "inkl. Anlass und Datum"). Das Datum wird HIER eingefroren
-     * (Anlass::naechstesVorkommen() zum jetzigen Zeitpunkt), nicht live nachberechnet -
-     * sonst koennte ein wiederkehrender Anlass (dessen naechstesVorkommen() nie in der
-     * Vergangenheit liegt) niemals als "vergangen" erkannt werden. Vorausgesetzt wird, dass
-     * der Aufrufer bereits mit istGueltigerZielAnlass() geprueft hat, dass $anlassId existiert
-     * und nicht in der Vergangenheit liegt. Setzt geschenk_fuer_geburtstag zurueck, falls die
-     * Idee vorher fest fuer den Geburtstag war - eine Idee ist immer nur fuer GENAU ein Ziel
-     * fest zugeordnet.
+     * Macht die Idee zum festen Geschenk fuer einen Anlass. Das Datum wird dabei festgehalten,
+     * sonst wuerde ein jaehrlicher Anlass nie als vergangen gelten.
      */
     public static function festMachen(int $id, int $anlassId): void
     {
@@ -141,13 +126,7 @@ class Geschenkidee
         ]);
     }
 
-    /**
-     * Wandelt die Idee in ein "festes" Geschenk fuer den Geburtstag der zugehoerigen Person
-     * um - Gegenstueck zu festMachen() fuer den Fall, dass der Geburtstag selbst (nicht ein
-     * Eintrag aus anlaesse) das Ziel ist. Braucht eine eigene Methode statt eines Aufrufs von
-     * festMachen() mit einer Geburtstag-"ID", weil der Geburtstag keine echte anlaesse-Zeile
-     * und damit keine gueltige anlass_id hat (siehe Schema-Kommentar).
-     */
+    /** Wie festMachen(), nur fuer den Geburtstag (der hat keine eigene Zeile in anlaesse). */
     public static function festMachenFuerGeburtstag(int $id): void
     {
         $idee = self::finden($id);
@@ -173,15 +152,8 @@ class Geschenkidee
         ]);
     }
     /**
-     * Erfasst ein bereits ausgehaendigtes Geschenk direkt rueckwirkend (Backfill historischer
-     * Daten) - im Unterschied zu festMachen() akzeptiert diese Methode NUR ein Datum in der
-     * Vergangenheit und setzt zusaetzlich besorgt = 1, da ein bereits vergangenes Geschenk
-     * zwangslaeufig schon besorgt wurde. Fuer zukuenftige Planung weiterhin festMachen()
-     * verwenden - beide schreiben dieselben geschenk_*-Felder und schliessen sich damit
-     * gegenseitig aus.
-     *
-     * @return bool false, wenn der Anlass nicht existiert oder $datum kein gueltiges,
-     *              bereits vergangenes Datum im Format Y-m-d ist
+     * Traegt ein schon uebergebenes Geschenk nachtraeglich ein (Datum muss in der Vergangenheit
+     * liegen, setzt besorgt). false bei unbekanntem Anlass oder ungueltigem Datum.
      */
     public static function vergangenMachen(int $id, int $anlassId, string $datum): bool
     {
@@ -211,13 +183,7 @@ class Geschenkidee
         return true;
     }
 
-    /**
-     * Gegenstueck zu vergangenMachen() fuer den Geburtstag der Person - analog zum Verhaeltnis
-     * von festMachenFuerGeburtstag() zu festMachen().
-     *
-     * @return bool false, wenn die Idee oder die zugehoerige Person nicht existiert, oder
-     *              $datum kein gueltiges, bereits vergangenes Datum im Format Y-m-d ist
-     */
+    /** Wie vergangenMachen(), nur fuer den Geburtstag. */
     public static function vergangenMachenFuerGeburtstag(int $id, string $datum): bool
     {
         $idee = self::finden($id);
@@ -251,12 +217,8 @@ class Geschenkidee
     }
 
     /**
-     * Trennt die Ideen einer Person in drei Rubriken - "offen" (keine feste Zuordnung), "fest"
-     * (fest zugeordnet, Termin steht noch bevor) und "vergangen" (fest zugeordnet, Termin
-     * bereits verstrichen) - zentrale Stelle statt dieselbe Schleife in person-bearbeiten.php
-     * und gesamtliste.php dupliziert zu pflegen.
+     * Teilt Ideen in "offen", "fest" (Termin kommt noch) und "vergangen".
      *
-     * @param array[] $ideen z. B. das Ergebnis von vonPerson()
      * @return array{offen: array[], fest: array[], vergangen: array[]}
      */
     public static function sortiereNachStatus(array $ideen, ?DateTimeImmutable $heute = null): array
@@ -285,15 +247,8 @@ class Geschenkidee
     }
 
     /**
-     * Beispieltexte fuer die LLM-gestuetzte Ideengenerierung (siehe Ideengenerator): ALLE
-     * bereits verschenkten und fest zugeordneten Ideen dieser Person (das eigentliche Signal,
-     * was der Person bereits geschenkt wurde bzw. schon geplant ist - bewusst ungedeckelt,
-     * nicht nur die neuesten N), ergaenzt um die 5 zuletzt angelegten noch offenen Ideen als
-     * zusaetzliche Basis, falls kaum oder keine Historie existiert (Nutzerwunsch 2026-09-13:
-     * "wenn es noch nie ein Geschenk gab, gibt es sonst keine Moeglichkeit, eine Idee zu
-     * generieren"). Liefert nur den Text (keine Bilder/Links/Personennamen) - Datensparsamkeit
-     * vor der Uebermittlung an einen externen Anbieter. Ideen ohne Text (nur Link/Bild) werden
-     * uebersprungen.
+     * Ideen-Texte fuer die KI: alle festen und vergangenen Geschenke plus die 5 neuesten offenen
+     * Ideen. Nur Text, keine Links oder Bilder.
      *
      * @return string[]
      */
@@ -313,14 +268,7 @@ class Geschenkidee
         )));
     }
 
-    /**
-     * Bereits bekannte Geschenkideen fuer den (kommenden) Geburtstag einer Person - fuer die
-     * monatliche Geburtstags-Vorschau in der Benachrichtigungsglocke (siehe navbar.php).
-     * Zaehlt sowohl lose "auch fuer den Geburtstag gedacht"-markierte Ideen (fuer_geburtstag)
-     * als auch fest fuer den Geburtstag zugeordnete, deren Termin noch nicht vergangen ist -
-     * ein bereits gefeierter Geburtstag soll hier nicht mehr als "bekannte Idee" fuer den
-     * naechsten auftauchen.
-     */
+    /** Ideen fuer den naechsten Geburtstag der Person (lose markiert oder fest zugeordnet). */
     public static function bekannteIdeenFuerGeburtstag(int $personId, ?DateTimeImmutable $heute = null): array
     {
         $heute ??= new DateTimeImmutable('today');
@@ -340,12 +288,7 @@ class Geschenkidee
     }
 
     /**
-     * Fortschritt pro Person fuer einen einzelnen Anlass (aktuell nur fuer den Weihnachtsstatus
-     * in der Benachrichtigungsglocke genutzt, siehe navbar.php) - Anzahl zugeordneter Ideen,
-     * davon "besorgt" markierte, sowie alle hinterlegten offenen Aufgaben. Zaehlt sowohl lose
-     * zugeordnete (anlaesse()) als auch fest zugeordnete Ideen, deren geschenk_datum noch
-     * nicht vergangen ist - dieselbe Fest/Lose-Unterscheidung wie in
-     * anlassNamenInklGeburtstag().
+     * Stand pro Person fuer einen Anlass: Anzahl Ideen, davon besorgt, offene Aufgaben.
      *
      * @return array<int, array{person_id: int, person: string, ideen: int, besorgt: int, offene_aufgaben: string[]}>
      */
@@ -403,13 +346,7 @@ class Geschenkidee
     }
 
     /**
-     * Kompakte Zusammenfassung von statusNachPersonFuerAnlass() fuer einen Pflichtanlass, der
-     * jede Person betrifft (aktuell Weihnachten) - fuer die Benachrichtigungsglocke. Statt eines
-     * Eintrags pro Person (bei vielen Personen wuerde das die Glocke fluten und alle anderen
-     * Benachrichtigungen verdraengen) drei alphabetische Namenslisten, aus denen die Glocke
-     * eine einzelne Zeile mit Zaehlern plus einer aufklappbaren Detailliste baut. Zusaetzlich
-     * zu statusNachPersonFuerAnlass() auch die Personen, fuer die noch gar keine Idee zu diesem
-     * Anlass existiert - gerade die sind bei einem Pflichtanlass am wichtigsten.
+     * Weihnachtsstatus fuer die Glocke: Namen mit allem besorgt, mit offenen Ideen und ganz ohne Idee.
      *
      * @return array{besorgt: string[], offen: string[], ohne_idee: string[]}
      */
@@ -437,12 +374,7 @@ class Geschenkidee
         return $zusammenfassung;
     }
 
-    /**
-     * Macht eine feste Geschenk-Zuordnung rueckgaengig - die Idee gilt danach wieder als
-     * "offen". Die losen Anlass-Tags (anlaesse()/fuer_geburtstag) werden davon nicht
-     * beruehrt, da sie waehrend der Fest-Zuordnung nicht veraendert wurden (siehe
-     * anlassNamenInklGeburtstag() - sie tauchen in der Anzeige automatisch wieder auf).
-     */
+    /** Hebt die feste Zuordnung auf. Die vorherigen Anlass-Tags sind dann wieder sichtbar. */
     public static function zurueckAufOffen(int $id): void
     {
         $pdo = Datenbank::verbinden();
@@ -454,22 +386,12 @@ class Geschenkidee
         $stmt->execute(['id' => $id]);
     }
 
-    /**
-     * Ist diese Idee ueberhaupt fest zugeordnet (zu einem Anlass ODER zum Geburtstag)?
-     * Zentrale Stelle fuer diese Pruefung, damit Aufrufer (Frontend, anlassNamenInklGeburtstag())
-     * nicht jeweils beide Felder einzeln abfragen muessen.
-     */
     public static function istFest(array $idee): bool
     {
         return $idee['geschenk_anlass_id'] !== null || (int) $idee['geschenk_fuer_geburtstag'] === 1;
     }
 
-    /**
-     * Ein Anlass darf nur dann fest zugeordnet werden, wenn sein naechstes Vorkommen noch
-     * nicht vergangen ist - man soll keine Geschenke rueckwirkend fuer die Vergangenheit
-     * "planen". Bei wiederkehrenden Anlaessen ist das durch naechstesVorkommen() ohnehin
-     * immer erfuellt, bei einmaligen, bereits vergangenen Anlaessen greift die Sperre.
-     */
+    /** Fest zuordnen geht nur fuer Anlaesse, die noch bevorstehen. */
     public static function istGueltigerZielAnlass(array $anlass, ?DateTimeImmutable $heute = null): bool
     {
         $heute ??= new DateTimeImmutable('today');
@@ -489,22 +411,12 @@ class Geschenkidee
         return true;
     }
 
-    /**
-     * Ersetzt die komplette Anlass-Verknuepfung einer Idee durch $anlassIds (loeschen + neu
-     * anlegen statt Diff, analog zu Anlass::personenVerknuepfen() - die Mengen im
-     * Prototyp-Umfang sind klein).
-     *
-     * @param int[] $anlassIds
-     */
+    /** Ersetzt alle Anlass-Verknuepfungen der Idee. */
     private static function anlaesseVerknuepfen(PDO $pdo, int $geschenkideeId, array $anlassIds): void
     {
         Datenbank::ersetzeVerknuepfung($pdo, 'geschenkidee_anlaesse', 'geschenkidee_id', $geschenkideeId, 'anlass_id', $anlassIds);
     }
 
-    /**
-     * Alle Anlaesse, denen diese Idee zugeordnet ist, sortiert nach naechstem Vorkommen
-     * (nutzt Anlass::naechstesVorkommen(), analog zu Anlass::vonPerson()).
-     */
     public static function anlaesse(int $geschenkideeId): array
     {
         $pdo = Datenbank::verbinden();
@@ -526,23 +438,8 @@ class Geschenkidee
     }
 
     /**
-     * Namen (inkl. Datum) aller Anlaesse, die zu dieser Idee passen - fuer die Anzeige
-     * (Ideenlisten), im Format "Anlassname - TT.MM.JJJJ".
-     *
-     * Ist die Idee fest zugeordnet (siehe istFest() - entweder zu einem Anlass oder zum
-     * Geburtstag), wird NUR dieses eine Ziel gezeigt (mit "(vergangen)"-Zusatz, falls
-     * geschenk_datum bereits vorbei ist) - die losen Tags (anlaesse()/fuer_geburtstag) werden
-     * dann bewusst ausgeblendet, nicht geloescht: macht man die Fest-Zuordnung rueckgaengig
-     * (zurueckAufOffen()), tauchen sie hier automatisch wieder auf.
-     *
-     * Ist die Idee noch offen, werden die losen Verknuepfungen gezeigt: alle explizit
-     * verknuepften Anlaesse (siehe anlaesse()), deren naechstes Vorkommen noch nicht vergangen
-     * ist (ein bereits vergangener EINMALIGER Anlass wird hier nur ausgeblendet, nicht aus
-     * geschenkidee_anlaesse geloescht - wiederkehrende sind durch naechstesVorkommen() ohnehin
-     * nie "vergangen"), plus - nur falls fuer_geburtstag gesetzt ist - der Geburtstag der
-     * Person. Eine Idee ist NICHT automatisch fuer den Geburtstag gedacht (kann z. B.
-     * ausschliesslich ein Hochzeitsgeschenk oder ganz ohne Anlass sein), deshalb haengt das
-     * hier vom explizit gesetzten Flag ab statt immer dabei zu sein.
+     * Anlassnamen mit Datum fuer die Anzeige. Bei fester Zuordnung nur dieser eine Anlass, sonst
+     * die losen Tags (vergangene einmalige Anlaesse ausgeblendet).
      */
     public static function anlassNamenInklGeburtstag(int $geschenkideeId, ?DateTimeImmutable $heute = null): array
     {
@@ -596,11 +493,7 @@ class Geschenkidee
         return $namen;
     }
 
-    /**
-     * Eine Idee muss laut Anforderung als Text, Link und/oder Bild angegeben
-     * werden koennen - mindestens eine dieser drei Angaben ist noetig, damit
-     * die Idee ueberhaupt einen Inhalt hat.
-     */
+    /** Text, Link oder Bild - mindestens eins davon muss angegeben sein. */
     public static function hatInhalt(string $text, string $link, string $bildLink): bool
     {
         return $text !== '' || $link !== '' || $bildLink !== '';
@@ -611,26 +504,12 @@ class Geschenkidee
         return $text === '' || (strlen($text) <= 1000 && !SqlDenylist::enthaeltSchluesselwort($text));
     }
 
-    /**
-     * Gilt fuer "Link" und "Bild-Link" gleichermassen: beide sind einfache
-     * URL-Felder, ein leerer Wert ist erlaubt (optional).
-     */
     public static function istGueltigeUrl(string $url): bool
     {
         return $url === '' || (strlen($url) <= 2000 && filter_var($url, FILTER_VALIDATE_URL) !== false);
     }
 
-    /**
-     * Buendelt die Validierung von Person/Text/Link/Bild-Link fuer erstellen()/aktualisieren()
-     * in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) - zentrale Stelle statt
-     * dieselbe Pruefungs-/Fehlertext-Kette in idee-speichern.php und idee-bearbeiten.php
-     * dupliziert zu pflegen.
-     *
-     * @param ?array $person Bereits aufgeloeste Person (Person::finden()) oder null, falls
-     *                       keine/keine gueltige Person ausgewaehlt wurde
-     * @param string $offeneAufgaben Freitext zu noch offenen Aufgaben (optional, gleiche
-     *                               Regeln wie $text - siehe istGueltigerText())
-     */
+    /** Sammelt die Fehlermeldungen fuer das Ideen-Formular (leer = gueltig). */
     public static function validiereEingabe(?array $person, string $text, string $link, string $bildLink, string $offeneAufgaben = ''): array
     {
         $fehler = [];

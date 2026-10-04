@@ -4,9 +4,8 @@ require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 
-// Woher die Seite aufgerufen wurde (z. B. person-bearbeiten.php) - nach Speichern/Loeschen
-// geht es dorthin zurueck, siehe Ruecksprung.
-$zurueck = Ruecksprung::ausAnfrage('idee-speichern.php');
+// Nach dem Speichern zurueck zur aufrufenden Seite, sonst zur Person der Idee.
+$zurueck = Ruecksprung::ausAnfrage('person-anzeigen.php');
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
@@ -22,6 +21,8 @@ if (!$idee) {
     exit;
 }
 
+$zurueck = Ruecksprung::ausAnfrage('person-bearbeiten.php?id=' . (int) $idee['person_id']);
+
 $fehler = [];
 $personId = (string) $idee['person_id'];
 $text = $idee['text'] ?? '';
@@ -34,12 +35,7 @@ $offeneAufgaben = $idee['offene_aufgaben'] ?? '';
 
 $aktion = $_POST['aktion'] ?? '';
 
-// Alle frei editierbaren Formularfelder werden bei JEDEM POST neu aus $_POST gelesen, nicht
-// nur beim finalen "speichern" - alle Buttons (Fest machen, Fertig im Anlass-Dialog, Löschen,
-// ...) gehoeren zum selben <form> und schicken deshalb immer den kompletten aktuellen
-// Formularstand mit. Wuerde man das nur fuer aktion=speichern tun, gingen z. B. gerade
-// getippte Textaenderungen oder eine eben im Dialog getroffene Anlass-Auswahl beim Klick auf
-// einen ANDEREN Button stillschweigend verloren (genau das war vorher der Fall).
+// Alle Buttons stecken in einem Formular: Felder bei jedem POST lesen, sonst gehen Eingaben verloren.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $personId = trim($_POST['person'] ?? '');
     $text = trim($_POST['text'] ?? '');
@@ -50,27 +46,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $offeneAufgaben = trim($_POST['offene_aufgaben'] ?? '');
 }
 
-// Anlaesse, die dieser (ggf. gerade erst gewaehlten) Person zugeordnet werden duerfen - fuer
-// die Checkbox-Liste im Dialog. Nicht Anlass::alle(), sonst muesste man aus der kompletten,
-// personenfremden Liste raten, welche Anlaesse ueberhaupt zu dieser Person passen (siehe
-// Anlass::vonPersonInklGeschuetzte()).
+// Im Dialog nur Anlaesse der gewaehlten Person anbieten.
 $gueltigeAnlaesse = $personId !== '' ? Anlass::vonPersonInklGeschuetzte((int) $personId) : [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Sanity-Check bewusst gegen ALLE existierenden Anlaesse, nicht nur die der Person: eine
-    // Idee kann bereits lose Tags zu Anlaessen haben, die (z. B. nach einer spaeteren
-    // Aenderung der Personen-Verknuepfung) nicht mehr zu $gueltigeAnlaesse gehoeren - die
-    // Personen-Einschraenkung gilt nur fuer neu anbietbare Checkboxen im Dialog, nicht als
-    // rueckwirkende Loesch-Regel beim Speichern (sonst wuerden bereits bestehende Tags beim
-    // naechsten Speichern still verschwinden).
+    // Gegen alle Anlaesse pruefen, damit bestehende Tags nicht verloren gehen, wenn die Person gewechselt hat.
     $anlassIds = array_values(array_intersect(
         array_map('intval', $_POST['anlass_ids'] ?? []),
         array_column(Anlass::alle(), 'id')
     ));
 }
 
-// Fuer "Fest zuordnen" zusaetzlich auf noch nicht vergangene Anlaesse eingeschraenkt (siehe
-// Geschenkidee::istGueltigerZielAnlass()) - bei wiederkehrenden Anlaessen ohnehin immer erfuellt.
+// Fest zuordnen nur zu Anlaessen, die noch bevorstehen.
 $heute = new DateTimeImmutable('today');
 $gueltigeFestAnlaesse = array_values(array_filter(
     $gueltigeAnlaesse,
@@ -161,11 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $personen = Person::alle();
 $aktuellePerson = Person::finden((int) $personId);
 
-// Anders als auf idee-speichern.php (siehe dort) NICHT automatisch beim ersten Laden oeffnen:
-// bei einer bestehenden Idee ist die Person hier immer schon bekannt, unabhaengig davon, wieso
-// die Seite aufgerufen wurde (z. B. nur um "Fest machen" zu klicken) - ein automatisch
-// aufgehender Dialog waere dann in den allermeisten Faellen ungewollt. Nur der explizite Klick
-// auf "Weitere Anlässe bearbeiten" oeffnet ihn.
+// Dialog hier nur auf Klick oeffnen, nicht automatisch wie beim Erstellen.
 $anlaesseGeladen = $aktuellePerson !== null && $aktion === 'anlaesse_laden';
 
 $istFest = Geschenkidee::istFest($idee);
@@ -199,78 +182,35 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
     <?php endforeach; ?>
 
-    <form class="ideen-formular" method="post">
+    <?php /* Ein Formular fuer alle Kaesten, damit Eingaben bei jedem Button erhalten bleiben. */ ?>
+    <form method="post" class="abschnitte">
 
         <input type="hidden" name="id" value="<?= (int) $id ?>">
 
-        <label for="person">Person:</label>
-        <select id="person" name="person">
-            <option value="">Person auswählen</option>
-            <?php foreach ($personen as $p): ?>
-                <option value="<?= (int) $p['id'] ?>" <?= (string) $p['id'] === $personId ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($p['name']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
+        <?php /* Enter speichert: der erste Submit-Button im Formular ist der Standard. Nur optisch
+                 versteckt, manche Browser ignorieren sonst einen unsichtbaren Button. */ ?>
+        <button type="submit" name="aktion" value="speichern" class="standard-button" tabindex="-1" aria-hidden="true">Änderungen speichern</button>
 
-        <label>Weitere Anlässe (optional):</label>
+        <section class="ideen-formular">
 
-        <?php if ($istFest): ?>
+            <h2>Angaben zur Idee</h2>
 
-            <?php /* Waehrend die Idee fest zugeordnet ist, werden die losen Tags in der
-                     Anzeige ohnehin komplett durch den festen Anlass ersetzt (siehe
-                     Geschenkidee::anlassNamenInklGeburtstag()) - ihre Bearbeitung waere hier
-                     also wirkungslos. Als versteckte Felder weiterreichen, damit "Änderungen
-                     speichern" die bestehenden Tags nicht versehentlich loescht; sie tauchen
-                     nach "Fest-Zuordnung aufheben" automatisch wieder editierbar auf. */ ?>
-            <p class="hinweis">Ausgeblendet, solange diese Idee fest zugeordnet ist.</p>
-            <?php foreach ($anlassIds as $gewaehlteAnlassId): ?>
-                <input type="hidden" name="anlass_ids[]" value="<?= (int) $gewaehlteAnlassId ?>">
-            <?php endforeach; ?>
-            <?php if ($fuerGeburtstag): ?>
-                <input type="hidden" name="fuer_geburtstag" value="1">
-            <?php endif; ?>
+            <label for="person">Person:</label>
+            <select id="person" name="person">
+                <option value="">Person auswählen</option>
+                <?php foreach ($personen as $p): ?>
+                    <option value="<?= (int) $p['id'] ?>" <?= (string) $p['id'] === $personId ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($p['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
 
-        <?php else: ?>
+            <label>Weitere Anlässe (optional):</label>
 
-            <button type="submit" name="aktion" value="anlaesse_laden">
-                Weitere Anlässe bearbeiten<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
-            </button>
+            <?php if ($istFest): ?>
 
-            <?php if ($aktion === 'anlaesse_laden' && $aktuellePerson === null): ?>
-                <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
-            <?php endif; ?>
-
-            <?php if ($anlaesseGeladen): ?>
-
-                <dialog open class="anlass-dialog">
-
-                    <div class="fenster-kopf">
-                        <h3>Anlässe von <?= htmlspecialchars($aktuellePerson['name']) ?></h3>
-                    </div>
-
-                    <label class="anlass-checkbox">
-                        <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
-                        Geburtstag
-                    </label>
-
-                    <?php if (empty($gueltigeAnlaesse)): ?>
-                        <p>Keine weiteren Anlässe für diese Person hinterlegt.</p>
-                    <?php else: ?>
-                        <?php foreach ($gueltigeAnlaesse as $anlass): ?>
-                            <label class="anlass-checkbox">
-                                <input type="checkbox" name="anlass_ids[]" value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'checked' : '' ?>>
-                                <?= htmlspecialchars($anlass['name']) ?>
-                            </label>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-
-                    <button type="submit" name="aktion" value="anlaesse_schliessen">Fertig</button>
-
-                </dialog>
-
-            <?php else: ?>
-
+                <?php /* Bei fester Zuordnung sind die Tags ausgeblendet, werden aber unveraendert weitergegeben. */ ?>
+                <p class="hinweis">Ausgeblendet, solange diese Idee fest zugeordnet ist.</p>
                 <?php foreach ($anlassIds as $gewaehlteAnlassId): ?>
                     <input type="hidden" name="anlass_ids[]" value="<?= (int) $gewaehlteAnlassId ?>">
                 <?php endforeach; ?>
@@ -278,87 +218,173 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
                     <input type="hidden" name="fuer_geburtstag" value="1">
                 <?php endif; ?>
 
+            <?php else: ?>
+
+                <?php if ($aktion === 'anlaesse_laden' && $aktuellePerson === null): ?>
+                    <p class="fehler">Bitte zuerst eine Person auswählen.</p>
+                <?php endif; ?>
+
+                <button type="submit" name="aktion" value="anlaesse_laden">
+                    <?php $anzahlAusgewaehlt = count($anlassIds) + ($fuerGeburtstag ? 1 : 0); /* Geburtstag zaehlt mit. */ ?>Weitere Anlässe bearbeiten<?= $anzahlAusgewaehlt > 0 ? ' (' . $anzahlAusgewaehlt . ' ausgewählt)' : '' ?>
+                </button>
+
+                <?php if ($anlaesseGeladen): ?>
+
+                    <dialog open class="anlass-dialog">
+
+                        <div class="fenster-kopf">
+                            <h3>Anlässe von <?= htmlspecialchars($aktuellePerson['name']) ?></h3>
+                        </div>
+
+                        <label class="anlass-checkbox">
+                            <input type="checkbox" name="fuer_geburtstag" value="1" <?= $fuerGeburtstag ? 'checked' : '' ?>>
+                            Geburtstag
+                        </label>
+
+                        <?php if (empty($gueltigeAnlaesse)): ?>
+                            <p>Keine weiteren Anlässe für diese Person hinterlegt.</p>
+                        <?php else: ?>
+                            <?php foreach ($gueltigeAnlaesse as $anlass): ?>
+                                <label class="anlass-checkbox">
+                                    <input type="checkbox" name="anlass_ids[]" value="<?= (int) $anlass['id'] ?>" <?= in_array((int) $anlass['id'], $anlassIds, true) ? 'checked' : '' ?>>
+                                    <?= htmlspecialchars($anlass['name']) ?>
+                                </label>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+
+                        <button type="submit" name="aktion" value="anlaesse_schliessen">Fertig</button>
+
+                    </dialog>
+
+                <?php else: ?>
+
+                    <?php foreach ($anlassIds as $gewaehlteAnlassId): ?>
+                        <input type="hidden" name="anlass_ids[]" value="<?= (int) $gewaehlteAnlassId ?>">
+                    <?php endforeach; ?>
+                    <?php if ($fuerGeburtstag): ?>
+                        <input type="hidden" name="fuer_geburtstag" value="1">
+                    <?php endif; ?>
+
+                <?php endif; ?>
+
             <?php endif; ?>
 
-        <?php endif; ?>
+            <label for="text">Idee / Beschreibung:</label>
+            <textarea id="text" name="text" maxlength="1000"><?= htmlspecialchars($text) ?></textarea>
 
-        <label for="text">Idee / Beschreibung:</label>
-        <textarea id="text" name="text" maxlength="1000"><?= htmlspecialchars($text) ?></textarea>
+            <label for="link">Link:</label>
+            <input type="url" id="link" name="link" value="<?= htmlspecialchars($link) ?>">
 
-        <label for="link">Link:</label>
-        <input type="url" id="link" name="link" value="<?= htmlspecialchars($link) ?>">
+            <label for="bild_link">Bild (Link):</label>
+            <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
 
-        <label for="bild_link">Bild (Link):</label>
-        <input type="url" id="bild_link" name="bild_link" value="<?= htmlspecialchars($bildLink) ?>">
+            <label>
+                <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
+                Geschenk bereits besorgt
+            </label>
 
-        <label>
-            <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
-            Geschenk bereits besorgt
-        </label>
+            <label for="offene_aufgaben">Offene Aufgaben:</label>
+            <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>
 
-        <label for="offene_aufgaben">Offene Aufgaben:</label>
-        <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>
+            <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
 
-        <?php if ($istFest): ?>
-            <p>
-                Fest zugeordnet zu: <strong><?= htmlspecialchars($festName) ?></strong>
-                am <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>
-                <?php if ($festIstVergangen): ?><strong>(vergangen)</strong><?php endif; ?>
-            </p>
-        <?php else: ?>
-            <label for="geschenk_anlass_id">Fest zuordnen zu (macht diese Idee zum Geschenk für genau diesen Anlass):</label>
-            <select id="geschenk_anlass_id" name="geschenk_anlass_id">
-                <option value="">Anlass auswählen</option>
-                <option value="geburtstag">Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?></option>
-                <?php foreach ($gueltigeFestAnlaesse as $anlass): ?>
-                    <option value="<?= (int) $anlass['id'] ?>"><?= htmlspecialchars($anlass['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        <?php endif; ?>
+        </section>
+
+        <section class="ideen-formular">
+
+            <h2><?= !$istFest ? 'Als Geschenk festlegen' : ($festIstVergangen ? 'Vergangenes Geschenk' : 'Festgelegtes Geschenk') ?></h2>
+
+            <?php if ($istFest): ?>
+                <p>
+                    Fest zugeordnet zu: <strong><?= htmlspecialchars($festName) ?></strong>
+                    am <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>
+                    <?php if ($festIstVergangen): ?><strong>(vergangen)</strong><?php endif; ?>
+                </p>
+                <p class="hinweis-klein">Aufheben macht das Geschenk wieder zu einer offenen Idee.</p>
+
+                <button type="submit" name="aktion" value="offen_setzen" class="zweitrangig-button">Fest-Zuordnung aufheben</button>
+            <?php else: ?>
+                <p class="hinweis-klein">Macht die Idee zum Geschenk für genau einen kommenden Anlass. Sie steht dann auf der Personenseite unter „Festgelegte Geschenke“.</p>
+
+                <label for="geschenk_anlass_id">Anlass:</label>
+                <select id="geschenk_anlass_id" name="geschenk_anlass_id">
+                    <option value="">Anlass auswählen</option>
+                    <option value="geburtstag">Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?></option>
+                    <?php foreach ($gueltigeFestAnlaesse as $anlass): ?>
+                        <option value="<?= (int) $anlass['id'] ?>"><?= htmlspecialchars($anlass['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+
+                <button type="submit" name="aktion" value="fest_machen">Als Geschenk festlegen</button>
+            <?php endif; ?>
+
+        </section>
 
         <?php if (!$festIstVergangen): ?>
 
-            <h3>Als vergangenes Geschenk dokumentieren</h3>
+            <section class="ideen-formular">
 
-            <label for="vergangen_anlass">Anlass:</label>
-            <select id="vergangen_anlass" name="vergangen_anlass">
-                <option value="">Anlass auswählen</option>
-                <option value="geburtstag">
-                    Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?>
-                </option>
+                <h2>Als vergangenes Geschenk dokumentieren</h2>
 
-                <?php foreach ($gueltigeAnlaesse as $anlass): ?>
-                    <option value="<?= (int) $anlass['id'] ?>">
-                        <?= htmlspecialchars($anlass['name']) ?>
+                <p class="hinweis-klein">Für Geschenke, die schon überreicht wurden. Die Idee steht dann auf der Personenseite unter „Vergangene Geschenke“.</p>
+
+                <label for="vergangen_anlass">Anlass:</label>
+                <select id="vergangen_anlass" name="vergangen_anlass">
+                    <option value="">Anlass auswählen</option>
+                    <option value="geburtstag">
+                        Geburtstag<?= $aktuellePerson !== null ? ' von ' . htmlspecialchars($aktuellePerson['name']) : '' ?>
                     </option>
-                <?php endforeach; ?>
-            </select>
 
-            <label for="vergangen_datum">Geschenkt am:</label>
-            <input type="date"
-                   id="vergangen_datum"
-                   name="vergangen_datum"
-                   max="<?= htmlspecialchars((new DateTimeImmutable('yesterday'))->format('Y-m-d')) ?>">
+                    <?php foreach ($gueltigeAnlaesse as $anlass): ?>
+                        <option value="<?= (int) $anlass['id'] ?>">
+                            <?= htmlspecialchars($anlass['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
 
-            <button type="submit" name="aktion" value="vergangen_machen">
-                Als vergangenes Geschenk speichern
-            </button>
+                <label for="vergangen_datum">Geschenkt am:</label>
+                <input type="date"
+                       id="vergangen_datum"
+                       name="vergangen_datum"
+                       max="<?= htmlspecialchars((new DateTimeImmutable('yesterday'))->format('Y-m-d')) ?>">
+
+                <button type="submit" name="aktion" value="vergangen_machen">Als vergangenes Geschenk speichern</button>
+
+            </section>
 
         <?php endif; ?>
 
-        <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
+        <section class="ideen-formular kasten-gefahr">
 
-        <?php if ($istFest): ?>
-            <button type="submit" name="aktion" value="offen_setzen">Fest-Zuordnung aufheben</button>
-        <?php else: ?>
-            <button type="submit" name="aktion" value="fest_machen">Fest machen</button>
-        <?php endif; ?>
+            <h2>Idee löschen</h2>
 
-        <button type="submit" name="aktion" value="loeschen">Idee löschen</button>
+            <p class="hinweis-klein">Entfernt die Idee dauerhaft. Vorher kommt eine Sicherheitsabfrage.</p>
+
+            <button type="button" popovertarget="idee-loeschen-bestaetigen" class="gefahr-button">Idee löschen</button>
+
+        </section>
 
     </form>
 
-    <a href="<?= htmlspecialchars($zurueck) ?>">Zurück</a>
+    <?php /* Eigenes Formular, weil Formulare nicht verschachtelt sein duerfen. */ ?>
+    <div id="idee-loeschen-bestaetigen" popover class="bestaetigungs-fenster">
+        <div class="fenster-kopf">
+            <h2>Idee wirklich löschen?</h2>
+            <button class="schliessen"
+                    popovertarget="idee-loeschen-bestaetigen"
+                    popovertargetaction="hide">
+                ×
+            </button>
+        </div>
+
+        <p>Das kann nicht rückgängig gemacht werden.</p>
+
+        <form method="post" class="fenster-buttons">
+            <input type="hidden" name="id" value="<?= (int) $id ?>">
+            <button type="button" popovertarget="idee-loeschen-bestaetigen" popovertargetaction="hide">Abbrechen</button>
+            <button type="submit" name="aktion" value="loeschen" class="gefahr-button">Ja, endgültig löschen</button>
+        </form>
+    </div>
 
 </body>
 

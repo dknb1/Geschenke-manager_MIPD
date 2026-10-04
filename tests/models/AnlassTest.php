@@ -307,35 +307,73 @@ final class AnlassTest extends ModelTestCase
         $this->assertSame(['Im Januar'], $namen);
     }
 
-    public function testPersonenMitAnstehendemGeburtstagVereinigtFensterUndNaechstenMonat(): void
+    public function testPersonenMitGeburtstagInFristBeruecksichtigtNurDieFrist(): void
     {
         $heute = new DateTimeImmutable('2026-09-12');
 
-        // Heute - muss auftauchen (fiel frueher komplett aus der Glocke, siehe Anlass.php).
+        // Heute - gehoert zur Frist dazu.
         Person::erstellen('Heute', '1990-09-12', null, null);
-        // Noch im September, innerhalb von 7 Tagen - nur ueber das Erinnerungsfenster gefunden.
         Person::erstellen('In fuenf Tagen', '1990-09-17', null, null);
-        // Noch im September, aber ausserhalb des Fensters - weder Fenster noch naechster Monat.
+        // Ausserhalb der 7 Tage, obwohl noch im selben Monat.
         Person::erstellen('Ende September', '1990-09-28', null, null);
-        // Naechster Kalendermonat - unabhaengig vom Fenster enthalten.
+        // Naechster Kalendermonat - gehoert NICHT zur Frist (nur zur Monatsvorschau).
         Person::erstellen('Im Oktober', '1990-10-25', null, null);
-        // Uebernaechster Monat - nicht enthalten.
-        Person::erstellen('Im November', '1990-11-01', null, null);
 
-        $namen = array_column(Anlass::personenMitAnstehendemGeburtstag(7, $heute), 'name');
+        $namen = array_column(Anlass::personenMitGeburtstagInFrist(7, $heute), 'name');
 
-        $this->assertSame(['Heute', 'In fuenf Tagen', 'Im Oktober'], $namen);
+        $this->assertSame(['Heute', 'In fuenf Tagen'], $namen);
     }
 
-    public function testPersonenMitAnstehendemGeburtstagGrossesFensterReichtUeberNaechstenMonatHinaus(): void
+    public function testPersonenMitGeburtstagInFristKurzeFristIgnoriertNaechstenMonat(): void
     {
-        $heute = new DateTimeImmutable('2026-09-12');
+        // Regressionstest: Frist 1 Tag zeigte trotzdem Geburtstage in ueber 30 Tagen an.
+        $heute = new DateTimeImmutable('2026-10-04');
 
-        Person::erstellen('Im November', '1990-11-01', null, null);
-        Person::erstellen('Im Januar', '1990-01-10', null, null);
+        Person::erstellen('Morgen', '1990-10-05', null, null);
+        Person::erstellen('Im November', '1990-11-07', null, null);
 
-        $namen = array_column(Anlass::personenMitAnstehendemGeburtstag(60, $heute), 'name');
+        $namen = array_column(Anlass::personenMitGeburtstagInFrist(1, $heute), 'name');
 
-        $this->assertSame(['Im November'], $namen);
+        $this->assertSame(['Morgen'], $namen);
+    }
+
+    public function testGeburtstagsVorschauNaechsterMonatOhneGeburtstageInFrist(): void
+    {
+        $heute = new DateTimeImmutable('2026-09-28');
+
+        // Naechster Monat, aber schon innerhalb der 7 Tage - steht unter der Frist, nicht doppelt.
+        Person::erstellen('Anfang Oktober', '1990-10-02', null, null);
+        // Bewusst in umgekehrter Reihenfolge angelegt, um die Sortierung zu pruefen.
+        Person::erstellen('Ende Oktober', '1990-10-30', null, null);
+        Person::erstellen('Mitte Oktober', '1990-10-15', null, null);
+        // Noch im laufenden Monat (innerhalb der Frist) - nicht Teil der Vorschau.
+        Person::erstellen('Ende September', '1990-09-30', null, null);
+
+        $namen = array_column(Anlass::geburtstagsVorschauNaechsterMonat(7, $heute), 'name');
+
+        $this->assertSame(['Mitte Oktober', 'Ende Oktober'], $namen);
+    }
+
+    public function testAuswahlFuerIdeengenerierungEnthaeltNurAnstehendeAnlaesseDerPerson(): void
+    {
+        $heute = new DateTimeImmutable('2026-10-04');
+        $max = Person::erstellen('Max', '1990-06-15', null, null);
+        $anna = Person::erstellen('Anna', '1990-06-15', null, null);
+        Anlass::erstellen('Hochzeit von Max und Lisa', '2026-11-01', false, [$max]);
+        Anlass::erstellen('Schon vorbei', '2026-09-01', false, [$max]);
+        Anlass::erstellen('Jaehrliches Fest', '2020-05-01', true, [$max]);
+        Anlass::erstellen('Umzug Anna', '2026-12-01', false, [$anna]);
+
+        $auswahl = Anlass::auswahlFuerIdeengenerierung($max, $heute);
+
+        $this->assertSame('Kein bestimmter Anlass', $auswahl['keiner']);
+        // Nur das Wort, ohne Personennamen - der Name der Person wird nicht uebertragen.
+        $this->assertSame('Geburtstag', $auswahl['geburtstag']);
+        $namen = array_values($auswahl);
+        $this->assertContains('Hochzeit von Max und Lisa', $namen);
+        $this->assertContains('Jaehrliches Fest', $namen);
+        $this->assertContains('Weihnachten', $namen);
+        $this->assertNotContains('Schon vorbei', $namen);
+        $this->assertNotContains('Umzug Anna', $namen);
     }
 }

@@ -2,16 +2,10 @@
 
 require_once __DIR__ . '/../config/Datenbank.php';
 
-/**
- * Interessen einer Person (Tabelle person_interessen) aus einer festen Kategorienliste - als
- * zusaetzliche Grundlage fuer die Ideengenerierung, gerade wenn fuer eine Person noch kaum
- * Geschenkideen existieren. Bewusst nur feste Kategorien statt Freitext: an Groq sollen keine
- * frei formulierten, ggf. personenbezogenen Angaben gehen (aus demselben Grund werden auch
- * Alter, Geschlecht und das Feld "details" nicht uebertragen).
- */
+/** Interessen einer Person aus einer festen Liste, als Grundlage fuer die Ideengenerierung. */
 class Interesse
 {
-    /** Schluessel (in der DB gespeichert) => Anzeigename (in UI und Prompt verwendet). */
+    /** Schluessel (Datenbank) => Anzeigename. */
     public const KATEGORIEN = [
         'lesen' => 'Lesen',
         'kochen' => 'Kochen & Backen',
@@ -36,8 +30,7 @@ class Interesse
     ];
 
     /**
-     * Schluessel der Interessen einer Person, in der Reihenfolge von KATEGORIEN (nicht der
-     * Speicherreihenfolge) - so erscheinen sie in UI und Prompt immer gleich sortiert.
+     * Immer in der Reihenfolge der Liste, damit Anzeige und Prompt gleich sortiert sind.
      *
      * @return string[]
      */
@@ -52,8 +45,7 @@ class Interesse
     }
 
     /**
-     * Ersetzt die Interessen einer Person komplett. Unbekannte Schluessel (z. B. manipulierte
-     * Formularwerte) werden stillschweigend verworfen, statt in der DB zu landen.
+     * Ersetzt die Interessen einer Person. Unbekannte Werte werden verworfen.
      *
      * @param mixed[] $schluessel
      */
@@ -70,8 +62,6 @@ class Interesse
     }
 
     /**
-     * Filtert auf bekannte Schluessel (ohne Duplikate) und sortiert sie nach KATEGORIEN.
-     *
      * @param mixed[] $schluessel
      * @return string[]
      */
@@ -85,7 +75,7 @@ class Interesse
 
     /**
      * @param string[] $schluessel
-     * @return string[] Anzeigenamen in derselben Reihenfolge
+     * @return string[]
      */
     public static function bezeichnungen(array $schluessel): array
     {

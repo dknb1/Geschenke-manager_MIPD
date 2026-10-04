@@ -5,10 +5,13 @@ require_once __DIR__ . '/Person.php';
 
 class Anlass
 {
-    /**
-     * Sortiert nach dem nächsten Vorkommen (nicht dem rohen Datum), damit wiederkehrende
-     * Anlässe nicht dauerhaft an ihrer ursprünglichen Kalenderposition "einfrieren".
-     */
+    /** Fest hinterlegt, weil die intl-Erweiterung nicht ueberall installiert ist. */
+    public const MONATSNAMEN = [
+        1 => 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+        'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+    ];
+
+    /** Sortiert nach dem naechsten Termin, nicht nach dem gespeicherten Datum. */
     public static function alle(): array
     {
         $pdo = Datenbank::verbinden();
@@ -23,12 +26,7 @@ class Anlass
         return $anlaesse;
     }
 
-    /**
-     * Alle echten Anlaesse (siehe alle()) zusammen mit den live berechneten Geburtstagen aller
-     * Personen (siehe Person::geburtstagAlsAnlass()), gemeinsam nach naechstem Vorkommen
-     * sortiert. Zentrale Stelle fuer dieses Zusammenfuehren, das vorher in anlaesse.php und
-     * frontend/includes/navbar.php separat dupliziert war.
-     */
+    /** Alle Anlaesse plus die Geburtstage aller Personen, nach naechstem Termin sortiert. */
     public static function alleInklGeburtstage(): array
     {
         $anlaesse = array_map(
@@ -49,12 +47,7 @@ class Anlass
         return $alle;
     }
 
-    /**
-     * Alle Personen, deren naechster Geburtstag in den naechsten Kalendermonat faellt (z. B.
-     * heute im September -> Geburtstage im Oktober, unabhaengig von der einstellbaren
-     * "Tage vorher"-Erinnerung) - fuer die monatliche Geburtstags-Vorschau in der
-     * Benachrichtigungsglocke (siehe navbar.php). $heute ist fuer Tests injizierbar.
-     */
+    /** Personen mit Geburtstag im naechsten Kalendermonat. */
     public static function personenMitGeburtstagImNaechstenMonat(?DateTimeImmutable $heute = null): array
     {
         $heute ??= new DateTimeImmutable('today');
@@ -70,29 +63,36 @@ class Anlass
         ));
     }
 
-    /**
-     * Alle Personen, deren naechster Geburtstag entweder innerhalb der einstellbaren
-     * "Tage vorher"-Erinnerung liegt ODER in den naechsten Kalendermonat faellt - Quelle fuer
-     * den Geburtstags-Abschnitt der Benachrichtigungsglocke (siehe navbar.php). Beides wird
-     * bewusst vereinigt: Geburtstage werden dort nicht mehr zusaetzlich unter "Anstehende
-     * Anlaesse" gelistet, deshalb muss dieser Abschnitt auch Geburtstage im laufenden Monat
-     * (inkl. heute) abdecken, die personenMitGeburtstagImNaechstenMonat() allein nicht findet.
-     * Sortiert nach naechstem Geburtstag. $heute ist fuer Tests injizierbar.
-     */
-    public static function personenMitAnstehendemGeburtstag(int $tageVorher, ?DateTimeImmutable $heute = null): array
+    /** Personen, deren Geburtstag innerhalb der eingestellten Erinnerungsfrist liegt. */
+    public static function personenMitGeburtstagInFrist(int $tageVorher, ?DateTimeImmutable $heute = null): array
     {
         $heute ??= new DateTimeImmutable('today');
-        $fensterEnde = $heute->modify('+' . $tageVorher . ' days');
-        $imNaechstenMonat = array_column(self::personenMitGeburtstagImNaechstenMonat($heute), 'id');
+        $fristEnde = $heute->modify('+' . $tageVorher . ' days');
 
-        $personen = array_values(array_filter(
+        return self::nachNaechstemGeburtstagSortiert(array_values(array_filter(
             Person::alle(),
-            function (array $person) use ($heute, $fensterEnde, $imNaechstenMonat) {
-                $geburtstag = self::naechstesVorkommen(Person::geburtstagAlsAnlass($person), $heute);
-                return $geburtstag <= $fensterEnde || in_array($person['id'], $imNaechstenMonat, true);
-            }
-        ));
+            fn (array $person) =>
+                self::naechstesVorkommen(Person::geburtstagAlsAnlass($person), $heute) <= $fristEnde
+        )), $heute);
+    }
 
+    /**
+     * Geburtstage im naechsten Monat, die nicht schon in der Frist liegen. Getrennt gehalten,
+     * damit die Glocke sie als Vorschau zeigen kann, ohne sie mitzuzaehlen.
+     */
+    public static function geburtstagsVorschauNaechsterMonat(int $tageVorher, ?DateTimeImmutable $heute = null): array
+    {
+        $heute ??= new DateTimeImmutable('today');
+        $inFrist = array_column(self::personenMitGeburtstagInFrist($tageVorher, $heute), 'id');
+
+        return self::nachNaechstemGeburtstagSortiert(array_values(array_filter(
+            self::personenMitGeburtstagImNaechstenMonat($heute),
+            fn (array $person) => !in_array($person['id'], $inFrist, true)
+        )), $heute);
+    }
+
+    private static function nachNaechstemGeburtstagSortiert(array $personen, DateTimeImmutable $heute): array
+    {
         usort(
             $personen,
             fn (array $a, array $b) =>
@@ -103,14 +103,7 @@ class Anlass
         return $personen;
     }
 
-    /**
-     * Buendelt die Validierung von Name und Datum eines Anlasses fuer erstellen()/
-     * aktualisieren() in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) -
-     * zentrale Stelle statt dieselbe Pruefung in anlass-erstellen.php und
-     * anlass-bearbeiten.php dupliziert zu pflegen. Die Wiederholung wird bewusst NICHT hier
-     * mitgeprueft, da anlass-bearbeiten.php sie bei geschuetzten Anlaessen anders behandelt
-     * (siehe dort) - das ist der einzige Teil, der zwischen beiden Seiten wirklich abweicht.
-     */
+    /** Prueft Name und Datum. Die Wiederholung prueft die Seite selbst (Pflichtanlaesse weichen ab). */
     public static function validiereNameUndDatum(string $name, string $datum): array
     {
         $fehler = [];
@@ -126,10 +119,8 @@ class Anlass
     }
 
     /**
-     * Liefert für wiederkehrende Anlässe das nächste noch bevorstehende Datum (Monat/Tag
-     * bleiben, Jahr wird ggf. hochgezählt); für einmalige Anlässe das gespeicherte Datum
-     * unverändert. Hinweis: 29. Februar wird in Nicht-Schaltjahren auf den 1. März
-     * verschoben (DateTime-Standardverhalten) — für dieses Prototyp-Projekt akzeptiert.
+     * Naechster Termin: bei jaehrlichen Anlaessen dieses oder naechstes Jahr, sonst das
+     * gespeicherte Datum. Der 29. Februar wird in normalen Jahren zum 1. Maerz.
      */
     public static function naechstesVorkommen(array $anlass, ?DateTimeImmutable $heute = null): DateTimeImmutable
     {
@@ -158,10 +149,6 @@ class Anlass
         return $anlass !== false ? $anlass : null;
     }
 
-    /**
-     * @param int[] $personIds IDs der Personen, die zu diesem Anlass gehoeren (kann leer sein -
-     *                         ein Anlass muss nicht zwingend an Personen geknuepft sein)
-     */
     public static function erstellen(string $name, string $datum, bool $wiederholtJaehrlich, array $personIds = []): void
     {
         $pdo = Datenbank::verbinden();
@@ -179,13 +166,8 @@ class Anlass
     }
 
     /**
-     * @param int[] $personIds Wird für geschuetzte Anlaesse (z. B. Weihnachten) ignoriert -
-     *                         die betreffen laut Fachlichkeit alle Personen gleichzeitig und
-     *                         duerfen keiner einzelnen Person zugeordnet werden. Aus demselben
-     *                         Grund bleibt bei geschuetzten Anlaessen auch $wiederholtJaehrlich
-     *                         unveraendert - wuerde man es auf "nein" umstellen, wuerde
-     *                         naechstesVorkommen() das Datum stumpf einfrieren statt es
-     *                         jaehrlich hochzuzaehlen.
+     * Bei Pflichtanlaessen werden Personen und Wiederholung ignoriert: sie gelten fuer alle und
+     * wiederholen sich immer.
      */
     public static function aktualisieren(int $id, string $name, string $datum, bool $wiederholtJaehrlich, array $personIds = []): void
     {
@@ -212,20 +194,11 @@ class Anlass
         self::personenVerknuepfen($pdo, $id, $personIds);
     }
 
-    /**
-     * Ersetzt die komplette Personen-Verknuepfung eines Anlasses durch $personIds (loeschen +
-     * neu anlegen statt Diff, da die Mengen im Prototyp-Umfang klein sind).
-     *
-     * @param int[] $personIds
-     */
     private static function personenVerknuepfen(PDO $pdo, int $anlassId, array $personIds): void
     {
         Datenbank::ersetzeVerknuepfung($pdo, 'anlass_personen', 'anlass_id', $anlassId, 'person_id', $personIds);
     }
 
-    /**
-     * Alle Personen, die zu diesem Anlass gehoeren (alphabetisch sortiert).
-     */
     public static function personen(int $anlassId): array
     {
         $pdo = Datenbank::verbinden();
@@ -240,11 +213,26 @@ class Anlass
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Alle individuellen Anlässe, die mit dieser Person verknüpft sind, sortiert nach
-     * nächstem Vorkommen. Enthält NICHT den automatisch berechneten Geburtstag der Person
-     * (siehe Person::geburtstagAlsAnlass()) - der ist kein echter anlaesse-Datensatz.
-     */
+    /** Personennamen fuer alle Anlaesse in einer Abfrage (anlass_id => Namen). */
+    public static function personenNamenJeAnlass(): array
+    {
+        $pdo = Datenbank::verbinden();
+        $stmt = $pdo->query(
+            'SELECT anlass_personen.anlass_id, personen.name
+             FROM anlass_personen
+             JOIN personen ON personen.id = anlass_personen.person_id
+             ORDER BY personen.name COLLATE NOCASE'
+        );
+
+        $namen = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $zeile) {
+            $namen[(int) $zeile['anlass_id']][] = $zeile['name'];
+        }
+
+        return $namen;
+    }
+
+    /** Anlaesse, die mit der Person verknuepft sind (ohne Geburtstag und Pflichtanlaesse). */
     public static function vonPerson(int $personId): array
     {
         $pdo = Datenbank::verbinden();
@@ -265,13 +253,7 @@ class Anlass
         return $anlaesse;
     }
 
-    /**
-     * Alle Anlaesse EINER Person: ihre individuell verknuepften (vonPerson()) plus die
-     * geschuetzten, die fachlich immer alle Personen gleichzeitig betreffen (geschuetzte()) -
-     * sortiert nach naechstem Vorkommen. Zentrale Stelle statt dasselbe
-     * array_merge()+usort() in person-bearbeiten.php, gesamtliste.php und den
-     * Geschenkideen-Formularen dupliziert zu pflegen.
-     */
+    /** Anlaesse der Person inklusive Pflichtanlaesse wie Weihnachten. */
     public static function vonPersonInklGeschuetzte(int $personId): array
     {
         $anlaesse = array_merge(self::geschuetzte(), self::vonPerson($personId));
@@ -285,12 +267,24 @@ class Anlass
     }
 
     /**
-     * Alle geschuetzten Pflichtanlaesse (aktuell: Weihnachten), sortiert nach naechstem
-     * Vorkommen. Geschuetzte Anlaesse betreffen fachlich immer alle Personen gleichzeitig
-     * (siehe aktualisieren()) und werden deshalb nicht ueber anlass_personen verknuepft -
-     * fuer eine "welche Anlaesse betreffen diese Person"-Anzeige muessen sie zusaetzlich zu
-     * vonPerson() eingeblendet werden, siehe person-bearbeiten.php.
+     * Auswahl fuer die Ideengenerierung (Schluessel => Name, so wie er an Groq geht). Dient auch
+     * als Positivliste fuer das Formular. Beim Geburtstag nur das Wort, ohne Namen der Person.
      */
+    public static function auswahlFuerIdeengenerierung(int $personId, ?DateTimeImmutable $heute = null): array
+    {
+        $heute ??= new DateTimeImmutable('today');
+        $auswahl = ['keiner' => 'Kein bestimmter Anlass', 'geburtstag' => 'Geburtstag'];
+
+        foreach (self::vonPersonInklGeschuetzte($personId) as $anlass) {
+            if (self::naechstesVorkommen($anlass, $heute) >= $heute) {
+                $auswahl[(string) $anlass['id']] = $anlass['name'];
+            }
+        }
+
+        return $auswahl;
+    }
+
+    /** Pflichtanlaesse (aktuell nur Weihnachten). Sie gelten fuer alle Personen. */
     public static function geschuetzte(): array
     {
         return array_values(array_filter(
@@ -299,10 +293,7 @@ class Anlass
         ));
     }
 
-    /**
-     * Liefert false statt zu löschen, wenn der Anlass geschützt ist (z. B. Weihnachten)
-     * oder gar nicht existiert.
-     */
+    /** false, wenn der Anlass ein Pflichtanlass ist oder nicht existiert. */
     public static function loeschen(int $id): bool
     {
         $anlass = self::finden($id);

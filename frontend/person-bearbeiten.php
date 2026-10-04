@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $details = trim($_POST['details'] ?? '');
     $interessen = Interesse::nurGueltige((array) ($_POST['interessen'] ?? []));
 
-    $fehler = Person::validiereEingabe($name, $geburtsdatum, $geschlecht, $details);
+    $fehler = Person::validiereEingabe($name, $geburtsdatum, $geschlecht, $details, $id);
 
     if (empty($fehler)) {
         Person::aktualisieren(
@@ -95,37 +95,201 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
     <?php endforeach; ?>
 
-    <form method="post">
+    <div class="abschnitte">
 
-        <input type="hidden" name="id" value="<?= (int) $id ?>">
+        <form method="post" class="ideen-formular">
 
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" maxlength="100" required>
+            <h2>Angaben zur Person</h2>
 
-        <label for="geburtsdatum">Geburtsdatum:</label>
-        <input type="date" id="geburtsdatum" name="geburtsdatum" value="<?= htmlspecialchars($geburtsdatum) ?>" required>
+            <input type="hidden" name="id" value="<?= (int) $id ?>">
 
-        <label for="geschlecht">Geschlecht:</label>
-        <select id="geschlecht" name="geschlecht">
-            <option value="">Bitte auswählen</option>
-            <option value="maennlich" <?= $geschlecht === 'maennlich' ? 'selected' : '' ?>>Männlich</option>
-            <option value="weiblich" <?= $geschlecht === 'weiblich' ? 'selected' : '' ?>>Weiblich</option>
-            <option value="divers" <?= $geschlecht === 'divers' ? 'selected' : '' ?>>Divers</option>
-        </select>
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" maxlength="100" required>
 
-        <label for="details">Details:</label>
-        <textarea id="details" name="details" rows="5" maxlength="1000"><?= htmlspecialchars($details) ?></textarea>
+            <label for="geburtsdatum">Geburtsdatum:</label>
+            <input type="date" id="geburtsdatum" name="geburtsdatum" value="<?= htmlspecialchars($geburtsdatum) ?>" required>
 
-        <?php include 'includes/interessen-auswahl.php'; ?>
+            <label for="geschlecht">Geschlecht:</label>
+            <select id="geschlecht" name="geschlecht">
+                <option value="">Bitte auswählen</option>
+                <option value="maennlich" <?= $geschlecht === 'maennlich' ? 'selected' : '' ?>>Männlich</option>
+                <option value="weiblich" <?= $geschlecht === 'weiblich' ? 'selected' : '' ?>>Weiblich</option>
+                <option value="divers" <?= $geschlecht === 'divers' ? 'selected' : '' ?>>Divers</option>
+            </select>
 
-        <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
-        <?php /* Loeschen nicht direkt, sondern erst nach Bestaetigung im Popover unten - eine
-                 Person nimmt per ON DELETE CASCADE alle ihre Geschenke und Ideen mit, das ist
-                 nicht rueckgaengig zu machen. Natives popover (wie die Glocke in der Navbar)
-                 statt JavaScript-confirm(), damit die Folgen konkret benannt werden koennen. */ ?>
-        <button type="button" popovertarget="person-loeschen-bestaetigen">Person löschen</button>
+            <label for="details">Details:</label>
+            <textarea id="details" name="details" rows="5" maxlength="1000"><?= htmlspecialchars($details) ?></textarea>
 
-    </form>
+            <?php include 'includes/interessen-auswahl.php'; ?>
+
+            <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
+
+        </form>
+
+        <section class="kasten">
+            <h2>Anlässe von <?= htmlspecialchars($name) ?></h2>
+
+            <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-erstellen.php?person=' . $id, 'person-bearbeiten.php?id=' . $id)) ?>" class="aktions-button">Neuen Anlass für <?= htmlspecialchars($name) ?> erstellen</a>
+            <?php $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person); ?>
+            <p>
+                <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> -
+                <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
+                <strong>(Geburtstag)</strong>
+            </p>
+            <?php if (empty($verknuepfteAnlaesse)): ?>
+                <p>Keine weiteren Anlässe hinterlegt.</p>
+            <?php else: ?>
+                <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-bearbeiten.php?id=' . (int) $verknuepfterAnlass['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
+                        <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
+                        <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
+                        <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
+                            <strong>(Pflichtanlass)</strong>
+                        <?php endif; ?>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </section>
+
+        <section class="kasten">
+            <h2>Geschenkideen für <?= htmlspecialchars($name) ?></h2>
+
+            <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-speichern.php?person=' . $id, 'person-bearbeiten.php?id=' . $id)) ?>" class="aktions-button">Neue Geschenkidee für <?= htmlspecialchars($name) ?> anlegen</a>
+            <a href="ideen-generieren.php?person=<?= $id ?>" class="aktions-button">Geschenkideen generieren lassen</a>
+
+            <?php if (empty($offeneGeschenkideen)): ?>
+                <p>Keine offenen Geschenkideen hinterlegt.</p>
+            <?php else: ?>
+                <ul class="ideen-liste">
+                    <?php foreach ($offeneGeschenkideen as $idee): ?>
+                        <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
+                        <li>
+                            <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
+                                <?php if (!empty($idee['text'])): ?>
+                                    <?= htmlspecialchars($idee['text']) ?>
+                                <?php endif; ?>
+                                <?php if (!empty($anlassNamen)): ?>
+                                    (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
+                                <?php endif; ?>
+                            </a>
+                            <p>Besorgt: <strong><?= (int) ($idee['besorgt'] ?? 0) === 1 ? 'Ja' : 'Nein' ?></strong></p>
+                            <?php if (!empty($idee['offene_aufgaben'])): ?>
+                                <p>Offene Aufgaben: <?= htmlspecialchars($idee['offene_aufgaben']) ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($idee['link']) || !empty($idee['bild_link'])): ?>
+                                <div class="ideen-liste-extras">
+                                    <?php if (!empty($idee['link'])): ?>
+                                        <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
+                                    <?php endif; ?>
+
+                                    <?php if (!empty($idee['bild_link'])): ?>
+                                        <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </section>
+
+        <section class="kasten">
+            <h2>Festgelegte Geschenke für <?= htmlspecialchars($name) ?></h2>
+            <?php if (empty($festeGeschenke)): ?>
+                <p>Keine Geschenke fest zugeordnet.</p>
+            <?php else: ?>
+                <ul class="ideen-liste">
+                    <?php foreach ($festeGeschenke as $idee): ?>
+                        <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
+                        <li>
+                            <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
+                                <?php if (!empty($idee['text'])): ?>
+                                    <?= htmlspecialchars($idee['text']) ?>
+                                <?php endif; ?>
+                                <?php if (!empty($anlassNamen)): ?>
+                                    (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
+                                <?php endif; ?>
+                            </a>
+                            <p>Besorgt: <strong><?= (int) ($idee['besorgt'] ?? 0) === 1 ? 'Ja' : 'Nein' ?></strong></p>
+                            <?php if (!empty($idee['offene_aufgaben'])): ?>
+                                <p>Offene Aufgaben: <?= htmlspecialchars($idee['offene_aufgaben']) ?></p>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </section>
+
+        <section class="kasten">
+            <h2>Vergangene Geschenke für <?= htmlspecialchars($name) ?></h2>
+            <?php if (empty($vergangeneGeschenke)): ?>
+                <p>Keine vergangenen Geschenke dokumentiert.</p>
+            <?php else: ?>
+                <ul class="ideen-liste">
+                    <?php foreach ($vergangeneGeschenke as $idee): ?>
+                        <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
+                        <li>
+                            <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
+                                <?php if (!empty($idee['text'])): ?>
+                                    <?= htmlspecialchars($idee['text']) ?>
+                                <?php endif; ?>
+
+                                <?php if (!empty($anlassNamen)): ?>
+                                    (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
+                                <?php endif; ?>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+
+        </section>
+
+        <section class="kasten">
+            <h2>Geschenke und Ideen für <?= htmlspecialchars($name) ?> teilen</h2>
+
+            <?php if (empty($person['share_token'])): ?>
+
+                <p>Noch kein Link erstellt. Der Link zeigt eine schlanke, eigenständige Seite mit den
+                    offenen Ideen und festgelegten Geschenken dieser Person (ohne Login, ohne Zugriff auf
+                    den Rest der Anwendung) - z. B. zum Verschicken an Familie oder Freunde.</p>
+
+                <form method="post">
+                    <input type="hidden" name="id" value="<?= (int) $id ?>">
+                    <button type="submit" name="aktion" value="share_link_erstellen">Link zum Teilen erstellen</button>
+                </form>
+
+            <?php else: ?>
+
+                <?php
+                    $shareSchema = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $shareBasispfad = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+                    $shareUrl = $shareSchema . '://' . $_SERVER['HTTP_HOST'] . $shareBasispfad
+                        . '/share.php?token=' . urlencode($person['share_token']);
+                ?>
+
+                <label for="share_link">Link zum Teilen (Text markieren und kopieren):</label>
+                <input type="text" id="share_link" value="<?= htmlspecialchars($shareUrl) ?>" readonly>
+
+                <form method="post">
+                    <input type="hidden" name="id" value="<?= (int) $id ?>">
+                    <button type="submit" name="aktion" value="share_link_erstellen">Link neu generieren (alter Link wird ungültig)</button>
+                </form>
+
+            <?php endif; ?>
+
+        </section>
+
+        <section class="kasten kasten-gefahr">
+            <h2>Person löschen</h2>
+
+            <p class="hinweis-klein">Entfernt die Person mit allen ihren Geschenken und Ideen dauerhaft. Vorher kommt eine Sicherheitsabfrage.</p>
+
+            <?php /* Erst nach Bestaetigung, weil alle Geschenke und Ideen der Person mitgeloescht werden. */ ?>
+            <button type="button" popovertarget="person-loeschen-bestaetigen" class="gefahr-button">Person löschen</button>
+        </section>
+
+    </div>
 
     <div id="person-loeschen-bestaetigen" popover class="bestaetigungs-fenster">
         <div class="fenster-kopf">
@@ -155,147 +319,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" name="aktion" value="loeschen" class="gefahr-button">Ja, endgültig löschen</button>
         </form>
     </div>
-    <h2>Anlässe von <?= htmlspecialchars($name) ?></h2>
-    <?php $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person); ?>
-    <p>
-        <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> -
-        <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
-        <strong>(Geburtstag)</strong>
-    </p>
-    <?php if (empty($verknuepfteAnlaesse)): ?>
-        <p>Keine weiteren Anlässe hinterlegt.</p>
-    <?php else: ?>
-        <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
-            <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-bearbeiten.php?id=' . (int) $verknuepfterAnlass['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
-                <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
-                <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
-                <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
-                    <strong>(Pflichtanlass)</strong>
-                <?php endif; ?>
-            </a>
-        <?php endforeach; ?>
-    <?php endif; ?>
-    <h2>Geschenkideen für <?= htmlspecialchars($name) ?></h2>
-
-    <p>
-        <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-speichern.php?person=' . $id, 'person-bearbeiten.php?id=' . $id)) ?>">Neue Geschenkidee für <?= htmlspecialchars($name) ?> anlegen</a>
-        &middot;
-        <a href="ideen-generieren.php?person=<?= $id ?>">Geschenkideen generieren lassen</a>
-    </p>
-
-    <?php if (empty($offeneGeschenkideen)): ?>
-        <p>Keine offenen Geschenkideen hinterlegt.</p>
-    <?php else: ?>
-        <ul class="ideen-liste">
-            <?php foreach ($offeneGeschenkideen as $idee): ?>
-                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
-                <li>
-                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
-                        <?php if (!empty($idee['text'])): ?>
-                            <?= htmlspecialchars($idee['text']) ?>
-                        <?php endif; ?>
-                        <?php if (!empty($anlassNamen)): ?>
-                            (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
-                        <?php endif; ?>
-                    </a>
-                    <p>Besorgt: <strong><?= (int) ($idee['besorgt'] ?? 0) === 1 ? 'Ja' : 'Nein' ?></strong></p>
-                    <?php if (!empty($idee['offene_aufgaben'])): ?>
-                        <p>Offene Aufgaben: <?= htmlspecialchars($idee['offene_aufgaben']) ?></p>
-                    <?php endif; ?>
-                    <?php if (!empty($idee['link']) || !empty($idee['bild_link'])): ?>
-                        <div class="ideen-liste-extras">
-                            <?php if (!empty($idee['link'])): ?>
-                                <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
-                            <?php endif; ?>
-
-                            <?php if (!empty($idee['bild_link'])): ?>
-                                <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
-    <h2>Festgelegte Geschenke für <?= htmlspecialchars($name) ?></h2>
-    <?php if (empty($festeGeschenke)): ?>
-        <p>Keine Geschenke fest zugeordnet.</p>
-    <?php else: ?>
-        <ul class="ideen-liste">
-            <?php foreach ($festeGeschenke as $idee): ?>
-                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
-                <li>
-                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
-                        <?php if (!empty($idee['text'])): ?>
-                            <?= htmlspecialchars($idee['text']) ?>
-                        <?php endif; ?>
-                        <?php if (!empty($anlassNamen)): ?>
-                            (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
-                        <?php endif; ?>
-                    </a>
-                    <p>Besorgt: <strong><?= (int) ($idee['besorgt'] ?? 0) === 1 ? 'Ja' : 'Nein' ?></strong></p>
-                    <?php if (!empty($idee['offene_aufgaben'])): ?>
-                        <p>Offene Aufgaben: <?= htmlspecialchars($idee['offene_aufgaben']) ?></p>
-                    <?php endif; ?>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
-    <h2>Vergangene Geschenke für <?= htmlspecialchars($name) ?></h2>
-    <?php if (empty($vergangeneGeschenke)): ?>
-        <p>Keine vergangenen Geschenke dokumentiert.</p>
-    <?php else: ?>
-        <ul class="ideen-liste">
-            <?php foreach ($vergangeneGeschenke as $idee): ?>
-                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
-                <li>
-                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-bearbeiten.php?id=' . (int) $idee['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
-                        <?php if (!empty($idee['text'])): ?>
-                            <?= htmlspecialchars($idee['text']) ?>
-                        <?php endif; ?>
-
-                        <?php if (!empty($anlassNamen)): ?>
-                            (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
-                        <?php endif; ?>
-                    </a>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
-
-    <h2>Geschenke und Ideen für <?= htmlspecialchars($name) ?> teilen</h2>
-
-    <?php if (empty($person['share_token'])): ?>
-
-        <p>Noch kein Link erstellt. Der Link zeigt eine schlanke, eigenständige Seite mit den
-            offenen Ideen und festgelegten Geschenken dieser Person (ohne Login, ohne Zugriff auf
-            den Rest der Anwendung) - z. B. zum Verschicken an Familie oder Freunde.</p>
-
-        <form method="post">
-            <input type="hidden" name="id" value="<?= (int) $id ?>">
-            <button type="submit" name="aktion" value="share_link_erstellen">Link zum Teilen erstellen</button>
-        </form>
-
-    <?php else: ?>
-
-        <?php
-            $shareSchema = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $shareBasispfad = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
-            $shareUrl = $shareSchema . '://' . $_SERVER['HTTP_HOST'] . $shareBasispfad
-                . '/share.php?token=' . urlencode($person['share_token']);
-        ?>
-
-        <label for="share_link">Link zum Teilen (Text markieren und kopieren):</label>
-        <input type="text" id="share_link" value="<?= htmlspecialchars($shareUrl) ?>" readonly>
-
-        <form method="post">
-            <input type="hidden" name="id" value="<?= (int) $id ?>">
-            <button type="submit" name="aktion" value="share_link_erstellen">Link neu generieren (alter Link wird ungültig)</button>
-        </form>
-
-    <?php endif; ?>
-
-    <a href="<?= htmlspecialchars($zurueck) ?>">Zurück</a>
 
 </body>
 

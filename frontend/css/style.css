@@ -10,6 +10,8 @@
     --nav: #1d2c42;
     --radius: 10px;
 }
+/* Scrollleiste immer anzeigen, damit beim Seitenwechsel nichts zur Seite springt. */
+html { overflow-y: scroll; }
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
     font-size: 16px;
@@ -85,6 +87,16 @@ button {
 }
 button:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 button:disabled { opacity: .55; cursor: default; }
+/* Link, der etwas ausloest (z. B. anlegen), sieht aus wie ein Button. */
+a.aktions-button {
+    text-align: center;
+    padding: 11px 18px;
+    border-color: var(--accent);
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+}
+a.aktions-button:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 
 /* Navigation */
 .navbar {
@@ -93,9 +105,11 @@ button:disabled { opacity: .55; cursor: default; }
     left: 0;
     z-index: 1000;
     box-sizing: border-box;
+    /* 100% statt 100vw, damit die Navbar buendig mit dem Inhalt steht. */
+    --navbar-rand: max(24px, calc((100% - 1080px) / 2));
     width: 100%;
     height: 50px;
-    padding: 0 max(24px, calc((100vw - 1080px) / 2));
+    padding: 0 var(--navbar-rand);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -116,15 +130,6 @@ button:disabled { opacity: .55; cursor: default; }
     letter-spacing: -.02em;
 }
 .navbar-logo:hover { background: transparent; }
-.logo-icon {
-    padding: 7px 10px;
-    border: 1px solid #526c8d;
-    border-radius: 7px;
-    background: #304965;
-    color: white;
-    font-size: 15px;
-    letter-spacing: .02em;
-}
 .logo-text { color: #f6f8fb; }
 .navbar-right { display: flex; align-items: center; gap: 24px; }
 .home-button,
@@ -240,6 +245,14 @@ button:disabled { opacity: .55; cursor: default; }
 .fehler { padding: 12px 16px; border: 1px solid #dfb0ab; border-radius: 6px; background: #fff2f0; color: #a12d25; }
 .hinweis { padding: 12px 16px; border: 1px solid var(--line); border-radius: 6px; background: #f4f6f9; color: var(--muted); }
 /* Interessen bei Person anlegen/bearbeiten: kompaktes Raster statt 20 Checkboxen untereinander. */
+/* Filter auf der Anlassliste (anlaesse.php) */
+.anlass-filter-felder { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.anlass-filter-felder label { display: flex; flex-direction: column; gap: 6px; }
+.anlass-filter-schalter { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.anlass-filter-schalter label { display: flex; align-items: center; gap: 8px; font-weight: normal; }
+.anlass-filter-aktionen { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.anlass-filter-aktionen button, .anlass-filter-aktionen a { margin: 0; }
+.anlass-filter-treffer { color: var(--muted); }
 .interessen-auswahl { margin: 8px 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; }
 .interessen-auswahl legend { padding: 0 6px; font-weight: 600; }
 .hinweis-klein { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
@@ -289,13 +302,12 @@ button:disabled { opacity: .55; cursor: default; }
 .ideen-formular input, .ideen-formular select, .ideen-formular textarea { width: 100%; }
 .ideen-formular input[type="url"], .ideen-formular select { height: 2.9rem; padding: 0 .7rem; }
 .ideen-formular textarea { height: 6rem; padding: .7rem; resize: vertical; }
-.ideen-formular button { width: fit-content; }
+.ideen-formular button { width: auto; }
 .ideen-liste { display: flex; flex-direction: column; gap: .6rem; list-style: none; padding: 0; }
 .ideen-liste li { display: block; }
 .ideen-liste-extras { display: flex; flex-wrap: wrap; gap: .8rem; margin: .2rem 0 .6rem; }
 .ideen-liste-extras a { display: inline; padding: 0; margin: 0; border: none; border-radius: 0; background: transparent; text-decoration: underline; }
-.gesamtliste-person { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 20px; }
-.gesamtliste-drucken { margin-bottom: 16px; }
+.gesamtliste-drucken { width: 100%; margin-bottom: 16px; }
 
 /* Startseite: ruhiger Kopfbereich, eine gemeinsame Übersicht mit vier Zeilen. */
 .startseite { max-width: 1080px; padding: 0; border: 0; background: transparent; box-shadow: none; }
@@ -367,13 +379,12 @@ button:disabled { opacity: .55; cursor: default; }
     .startseite-karte::before { width: 44px; height: 44px; background-size: 23px; }
     .startseite-aktionen { grid-column: 2; grid-row: 3; margin-top: 12px; align-items: stretch; }
     .startseite-karte p { max-width: none; }
-    .navbar { padding: 0 20px; }
+    .navbar { --navbar-rand: 20px; }
     .navbar-right { gap: 18px; }
 }
 @media (max-width: 440px) {
-    .navbar { height: 68px; padding: 0 14px; }
+    .navbar { height: 68px; --navbar-rand: 14px; }
     .navbar-logo { font-size: 13px; gap: 8px; }
-    .logo-icon { padding: 6px; font-size: 12px; }
     .navbar-right { gap: 12px; }
     .home-button, .back-button { padding: 7px 9px; font-size: 12px; white-space: nowrap; }
     .page-container { padding: 18px; }
@@ -508,13 +519,56 @@ body:has(.ideen-formular) { max-width: 880px; }
     cursor: pointer;
 }
 .ideen-formular button {
-    justify-self: start;
+    justify-self: stretch;
     margin-top: 12px;
     min-height: 46px;
     padding: 11px 24px;
     font-size: 14px;
     box-shadow: 0 2px 4px rgb(29 44 66 / 9%);
 }
+/* Kaesten fuer eigenstaendige Abschnitte: Formulare nutzen .ideen-formular, alles andere .kasten. */
+.kasten {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    margin: 24px 0 38px;
+    padding: 28px 32px;
+    border: 1px solid #dce3eb;
+    border-top: 3px solid var(--accent);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 6px 24px rgb(29 44 66 / 5%);
+}
+.abschnitte { display: flex; flex-direction: column; gap: 20px; margin: 24px 0 38px; }
+.abschnitte > .ideen-formular, .abschnitte > .kasten { margin: 0; }
+.ideen-formular > h2, .kasten > h2 { margin: 0; font-size: 1.15rem; color: var(--ink); }
+.kasten > h3 { margin: 8px 0 0; font-size: 1rem; color: var(--ink); }
+.ideen-formular > .hinweis-klein, .kasten > .hinweis-klein { margin: 0; }
+.ideen-formular > p, .kasten > p { margin: 0; }
+.kasten > a, .kasten > form { margin: 0; }
+.kasten-gefahr { border-top-color: #a12d25; }
+/* Buttons in Kaesten einheitlich ueber die volle Breite (wie die blauen Aktions-Buttons). */
+.kasten > button, .kasten > form > button { width: 100%; margin-top: 4px; }
+/* Eintraege, die nur aus dem Titel bestehen: keine leere Trennlinie darunter. */
+.ideen-liste > li > a:first-child:last-child { margin: 0; padding: 0; border-bottom: 0; }
+/* Fragen ueber Radio-Buttons sehen aus wie normale Feldbeschriftungen. */
+.ideen-formular > .feld-titel { margin: 8px 0 0; color: #35445a; font-size: 14px; font-weight: 600; }
+/* Listen-Eintraege sind selbst Karten - innerhalb eines Kastens flach, sonst "Kasten im Kasten". */
+.kasten .ideen-liste { margin: 0; gap: 12px; }
+.kasten .ideen-liste > li { box-shadow: none; background: #fbfcfe; }
+/* Interessen-Haekchen im Formular kompakt statt als einzelne Kaesten. */
+.ideen-formular .interessen-raster label:has(input[type="checkbox"]) { padding: 6px 4px; border: 0; background: transparent; }
+/* Unterseiten 880px breit, nur die Startseite breiter. */
+body:has(.personen-eintrag), body:has(.anlass-filter), body:has(.kasten) { max-width: 880px; }
+@media (max-width: 600px) { .kasten { padding: 22px 18px; } }
+@media print { .kasten { box-shadow: none; } }
+/* Unsichtbarer Standard-Button fuer Enter (siehe idee-bearbeiten.php), nur optisch versteckt. */
+.standard-button { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip-path: inset(50%); border: 0; opacity: 0; pointer-events: none; }
+/* Fuer Aktionen, die etwas zuruecknehmen statt etwas Neues auszuloesen. */
+button.zweitrangig-button { background: white; color: var(--accent); }
+button.zweitrangig-button:hover { background: #f0f4f9; color: var(--accent-dark); }
 .ideen-liste { gap: 16px; margin-top: 20px; }
 .ideen-liste > li {
     padding: 0;

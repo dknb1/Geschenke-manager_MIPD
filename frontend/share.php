@@ -2,11 +2,8 @@
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 
-// Oeffentliche, schlanke Seite ohne Login/Navbar - bewusst als Ausnahme von einer kuenftigen
-// Login-Pflicht gedacht (siehe project_multiuser_decision): der Zugriffsschutz besteht
-// ausschliesslich aus dem unratbaren Token (Person::shareTokenGenerieren()), nicht aus einer
-// Session. Zeigt nur offene und festgelegte Geschenkideen - vergangene (bereits uebergebene)
-// sind fuer die Kaufentscheidung nicht relevant und werden bewusst weggelassen.
+// Oeffentliche Seite ohne Login, geschuetzt nur durch den Link-Schluessel. Zeigt offene und
+// festgelegte Geschenke, keine vergangenen.
 $token = trim($_GET['token'] ?? '');
 $person = Person::findenPerShareToken($token);
 

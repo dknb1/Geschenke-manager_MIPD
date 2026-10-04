@@ -1,16 +1,8 @@
 <?php
 
 /**
- * Zweite Verteidigungslinie fuer Freitextfelder (Person::details, Geschenkidee::text)
- * zusaetzlich zu den im Projekt durchgaengig verwendeten parametrisierten Queries, die die
- * eigentliche Injection-Verhinderung leisten (Anforderung: "Eingabefelder duerfen keine
- * SQL-Schluesselwoerter akzeptieren"). War vorher identisch in Person.php und
- * Geschenkidee.php dupliziert - hier zentral, damit eine Erweiterung der Liste nicht an
- * zwei Stellen synchron gepflegt werden muss.
- *
- * ALTER und UNION bewusst nicht enthalten - beides sind zu gebraeuchliche Alltagswoerter
- * ("Alter" = Lebensalter, "Union" z. B. in Buch-/Filmtiteln), die hier staendig faelschlich
- * abgelehnt wuerden.
+ * Zusaetzlicher Schutz fuer Freitextfelder; die eigentliche Absicherung sind Prepared Statements.
+ * ALTER und UNION fehlen absichtlich, das sind normale Woerter ("Alter").
  */
 class SqlDenylist
 {
@@ -21,11 +13,7 @@ class SqlDenylist
 
     private const SONDERZEICHEN = ['--', ';', '/*', '*/'];
 
-    /**
-     * Sucht die Schluesselwoerter als eigenstaendige Woerter (\b-Wortgrenzen), nicht als
-     * blosse Teilzeichenkette - sonst wuerden z. B. "Dropbox" oder "Selection" faelschlich
-     * abgelehnt, obwohl sie SELECT/DROP nur als Teil eines laengeren Wortes enthalten.
-     */
+    /** Nur ganze Woerter, damit z. B. "Dropbox" nicht als DROP erkannt wird. */
     public static function enthaeltSchluesselwort(string $eingabe): bool
     {
         foreach (self::SCHLUESSELWOERTER as $schluesselwort) {

@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
     <?php endforeach; ?>
 
-    <form method="post">
+    <form method="post" class="ideen-formular">
 
         <label for="name">Name:</label>
         <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" maxlength="100" required>
@@ -76,8 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit">Person speichern</button>
 
     </form>
-
-    <a href="person-anzeigen.php">Zurück zur Personenübersicht</a>
 
 </body>
 

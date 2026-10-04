@@ -20,6 +20,8 @@ $personen = Person::alle();
 
     <h1>Angelegte Personen</h1>
 
+    <a href="person-anlegen.php" class="aktions-button">Neue Person anlegen</a>
+
     <?php if (empty($personen)): ?>
         <p>Es wurden noch keine Personen angelegt.</p>
     <?php else: ?>
@@ -33,8 +35,6 @@ $personen = Person::alle();
             </a>
         <?php endforeach; ?>
     <?php endif; ?>
-
-    <a href="person-anlegen.php">Neue Person anlegen</a>
 
 </body>
 

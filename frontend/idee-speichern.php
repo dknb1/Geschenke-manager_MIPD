@@ -4,9 +4,7 @@ require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 
-// Nur gesetzt, wenn die Seite aus einem Kontext heraus geoeffnet wurde (z. B. "Neue
-// Geschenkidee fuer X" auf person-bearbeiten.php) - dann nach dem Speichern dorthin zurueck,
-// sonst wie bisher auf dieser Seite bleiben, um direkt die naechste Idee anzulegen.
+// Nach dem Speichern zurueck zur aufrufenden Seite, sonst zur gewaehlten Person.
 $zurueck = Ruecksprung::ausAnfrage('');
 
 $fehler = [];
@@ -30,32 +28,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $person = $personId !== '' ? Person::finden((int) $personId) : null;
 
-// Nur Anlaesse DIESER Person (plus geschuetzte, die fachlich immer alle betreffen) zur Auswahl
-// anbieten statt der kompletten Anlass-Liste aller Personen - sonst muesste man aus einer
-// potenziell langen, personenfremden Liste raten, welche Anlaesse ueberhaupt zur gewaehlten
-// Person passen. Siehe Anlass::vonPerson()/geschuetzte(), analog zu gesamtliste.php.
+// Nur Anlaesse der gewaehlten Person anbieten.
 $gueltigeAnlaesse = $person !== null ? Anlass::vonPersonInklGeschuetzte((int) $personId) : [];
 $gueltigeAnlassIds = array_column($gueltigeAnlaesse, 'id');
-// Absichtlich IMMER gegen die aktuell gueltigen IDs der (ggf. gerade erst gewaehlten) Person
-// gefiltert, nicht nur beim expliziten "Anlaesse laden" - falls die Person zwischen zwei
-// Anfragen gewechselt wurde, fallen dadurch automatisch nicht mehr passende Auswahlen raus,
-// statt versehentlich Anlaesse der vorherigen Person zu speichern.
+// Immer gegen die aktuelle Person filtern, falls sie zwischendurch gewechselt wurde.
 $anlassIds = array_values(array_intersect(
     array_map('intval', $_POST['anlass_ids'] ?? []),
     $gueltigeAnlassIds
 ));
 
-// Der Anlass-Dialog (<dialog open>, siehe unten) wird nur dann angezeigt, wenn er entweder
-// gerade explizit ueber den "Anlass auswählen"-Button neu geladen wurde, oder die Person schon
-// beim Seitenaufruf feststand (Direktlink von person-bearbeiten.php mit ?person=ID, siehe dort).
-// <dialog open> statt popovertarget, weil sich ein popover ohne JavaScript nicht automatisch
-// nach einem Formular-Reload oeffnen laesst - <dialog open> ist dagegen ein normales,
-// deklaratives HTML-Attribut und erscheint direkt in der Serverantwort. Bei jedem anderen POST
-// (z. B. einem fehlgeschlagenen Speichern-Versuch nach Personenwechsel, oder dem "Fertig"-
-// Button im Dialog) wird der Dialog bewusst NICHT angezeigt, damit er nie versehentlich die
-// Anlaesse einer inzwischen abgewaehlten Person zeigt - ohne JavaScript kann eine Aenderung
-// der Personenauswahl sonst nicht erkannt werden. Erneutes Klicken auf "Anlass auswählen"
-// laedt dann einfach neu, diesmal mit der aktuell gewaehlten Person.
+// Dialog nur nach Klick auf den Button oder beim Aufruf mit fester Person zeigen. <dialog open>,
+// weil sich ein Popover ohne JavaScript nach dem Neuladen nicht von selbst oeffnet.
 $anlaesseGeladen = $person !== null
     && ($aktion === 'anlaesse_laden' || $_SERVER['REQUEST_METHOD'] !== 'POST');
 
@@ -73,13 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $aktion === 'speichern') {
             $besorgt,
             $offeneAufgaben !== '' ? $offeneAufgaben : null
         );
-        header('Location: ' . ($zurueck !== '' ? $zurueck : 'idee-speichern.php'));
+        header('Location: ' . ($zurueck !== '' ? $zurueck : 'person-bearbeiten.php?id=' . (int) $personId));
         exit;
     }
 }
 
 $personen = Person::alle();
-$ideen = Geschenkidee::alle();
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -90,14 +72,14 @@ $ideen = Geschenkidee::alle();
 
     <link rel="stylesheet" href="css/style.css">
 
-    <title>Geschenkidee speichern</title>
+    <title>Geschenkidee erstellen</title>
 </head>
 
 <body>
 
     <?php if ($zurueck !== '') { $navZurueck = $zurueck; } include 'includes/navbar.php'; ?>
 
-    <h1>Geschenkidee speichern</h1>
+    <h1>Geschenkidee erstellen</h1>
 
     <?php foreach ($fehler as $meldung): ?>
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
@@ -115,13 +97,13 @@ $ideen = Geschenkidee::alle();
             <?php endforeach; ?>
         </select>
 
-        <button type="submit" name="aktion" value="anlaesse_laden">
-            Weitere Anlässe bearbeiten<?= !empty($anlassIds) ? ' (' . count($anlassIds) . ' ausgewählt)' : '' ?>
-        </button>
-
         <?php if ($aktion === 'anlaesse_laden' && $person === null): ?>
-            <p class="hinweis">Bitte zuerst eine Person auswählen.</p>
+            <p class="fehler">Bitte zuerst eine Person auswählen.</p>
         <?php endif; ?>
+
+        <button type="submit" name="aktion" value="anlaesse_laden">
+            <?php $anzahlAusgewaehlt = count($anlassIds) + ($fuerGeburtstag ? 1 : 0); /* Geburtstag zaehlt mit. */ ?>Anlässe für Geschenkidee auswählen<?= $anzahlAusgewaehlt > 0 ? ' (' . $anzahlAusgewaehlt . ' ausgewählt)' : '' ?>
+        </button>
 
         <?php if ($anlaesseGeladen): ?>
 
@@ -153,10 +135,7 @@ $ideen = Geschenkidee::alle();
 
         <?php else: ?>
 
-            <?php /* Solange der Dialog nicht angezeigt wird, existieren seine Checkboxen nicht
-                     im DOM und wuerden beim naechsten Submit (z. B. "Idee speichern") sonst gar
-                     nicht mitgeschickt - die bereits getroffene Auswahl ginge verloren. Als
-                     verstecktes Feld weiterreichen, bis der Dialog das naechste Mal offen ist. */ ?>
+            <?php /* Dialog zu: Auswahl als versteckte Felder weitergeben, sonst ginge sie verloren. */ ?>
             <?php foreach ($anlassIds as $gewaehlteAnlassId): ?>
                 <input type="hidden" name="anlass_ids[]" value="<?= (int) $gewaehlteAnlassId ?>">
             <?php endforeach; ?>
@@ -183,42 +162,9 @@ $ideen = Geschenkidee::alle();
         <label for="offene_aufgaben">Offene Aufgaben:</label>
         <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>
 
-        <button type="submit" name="aktion" value="speichern">Idee speichern</button>
+        <button type="submit" name="aktion" value="speichern">Geschenkidee speichern</button>
 
     </form>
-
-    <h2>Gespeicherte Ideen</h2>
-
-    <?php if (empty($ideen)): ?>
-        <p>Es wurden noch keine Geschenkideen gespeichert.</p>
-    <?php else: ?>
-        <ul class="ideen-liste">
-            <?php foreach ($ideen as $idee): ?>
-                <?php $anlassNamen = Geschenkidee::anlassNamenInklGeburtstag((int) $idee['id']); ?>
-                <li>
-                    <a href="idee-bearbeiten.php?id=<?= (int) $idee['id'] ?>">
-                        <strong><?= htmlspecialchars($idee['person_name']) ?>:</strong>
-                        <?php if (!empty($idee['text'])): ?>
-                            <?= htmlspecialchars($idee['text']) ?>
-                        <?php endif; ?>
-                        <?php if (!empty($anlassNamen)): ?>
-                            (<?= htmlspecialchars(implode(', ', $anlassNamen)) ?>)
-                        <?php endif; ?>
-                    </a>
-                    <?php if (!empty($idee['link']) || !empty($idee['bild_link'])): ?>
-                        <div class="ideen-liste-extras">
-                            <?php if (!empty($idee['link'])): ?>
-                                <a href="<?= htmlspecialchars($idee['link']) ?>" target="_blank" rel="noopener noreferrer">Link</a>
-                            <?php endif; ?>
-                            <?php if (!empty($idee['bild_link'])): ?>
-                                <a href="<?= htmlspecialchars($idee['bild_link']) ?>" target="_blank" rel="noopener noreferrer">Bild</a>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
 
 </body>
 

@@ -4,11 +4,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../backend/models/Ideengenerator.php';
 
-/**
- * Testet nur die reinen, netzwerkfreien Teile (promptAufbauen()/antwortValidieren()) - der
- * eigentliche Groq-API-Aufruf (anfrageSenden()) braucht einen echten API-Key und Netzwerk und
- * wird bewusst nicht automatisiert getestet (manuell verifiziert, siehe Testabschlussbericht).
- */
+/** Testet nur die Teile ohne Netzwerk; der echte Groq-Aufruf wird von Hand getestet. */
 final class IdeengeneratorTest extends TestCase
 {
     public function testPromptAufbauenEnthaeltAlleBeispieleUndAnforderungAnDasFormat(): void
@@ -23,14 +19,13 @@ final class IdeengeneratorTest extends TestCase
 
     public function testPromptAufbauenUebernimmtInteressenAnlassUndBudget(): void
     {
-        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], ['Reisen', 'Musik'], 'weihnachten', 'bis_20');
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], ['Reisen', 'Musik'], 'Weihnachten', 'bis_20');
 
         $this->assertStringContainsString('Interessen der Person: Reisen, Musik.', $prompt);
         $this->assertStringContainsString('Anlass: Weihnachten.', $prompt);
         $this->assertStringContainsString('Budget: bis 20 €.', $prompt);
         $this->assertStringContainsString('- Kochbuch', $prompt);
-        // Zeilenumbrueche im Prompt immer als \n, unabhaengig von den Zeilenenden der
-        // Quelldatei (ein woertlicher Umbruch im String wuerde unter Windows zu \r\n).
+        // Im Prompt immer nur Zeilenumbrueche ohne \r, auch bei Windows-Zeilenenden in der Quelldatei.
         $this->assertStringNotContainsString("\r", $prompt);
     }
 
@@ -45,16 +40,28 @@ final class IdeengeneratorTest extends TestCase
 
     public function testPromptAufbauenLaesstLeereUndUnbekannteAngabenWeg(): void
     {
-        $prompt = Ideengenerator::promptAufbauen([], ['Lesen'], 'keiner', 'egal');
+        $prompt = Ideengenerator::promptAufbauen([], ['Lesen'], null, 'egal');
 
         $this->assertStringNotContainsString('Anlass:', $prompt);
         $this->assertStringNotContainsString('Budget:', $prompt);
         $this->assertStringNotContainsString('Bereits verschenkte', $prompt);
 
-        // Manipulierte Formularwerte duerfen nicht als Freitext im Prompt landen.
-        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], 'Hochzeit von Anna', '999 €');
-        $this->assertStringNotContainsString('Anna', $prompt);
+        // Manipuliertes Budget kommt nicht in den Prompt (den Anlass prueft die Seite selbst).
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], null, '999 €');
         $this->assertStringNotContainsString('999', $prompt);
+        $this->assertStringNotContainsString('Anlass:', Ideengenerator::promptAufbauen(['Kochbuch'], [], '   '));
+    }
+
+    public function testPromptAufbauenUebernimmtAnlassnameEinzeiligUndGekuerzt(): void
+    {
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], "Hochzeit
+von   Anna
+und Tom");
+        $this->assertStringContainsString('Anlass: Hochzeit von Anna und Tom.', $prompt);
+
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], str_repeat('a', 150));
+        $this->assertStringContainsString('Anlass: ' . str_repeat('a', 100) . '.', $prompt);
+        $this->assertStringNotContainsString(str_repeat('a', 101), $prompt);
     }
 
     public function testDatengrundlageIstDuennOhneInteressenUndMitWenigenIdeen(): void
@@ -105,9 +112,7 @@ final class IdeengeneratorTest extends TestCase
 
     public function testLetzteAnfrageUndLetzteAntwortSindLeerOhneGeneriereAufruf(): void
     {
-        // promptAufbauen()/antwortValidieren() rufen nie anfrageSenden() auf und duerfen die
-        // fuer die Transparenz-Anzeige (ideen-generieren.php) gedachten Werte deshalb nicht
-        // setzen - nur generiere() selbst tut das (nicht automatisiert getestet, siehe oben).
+        // Nur generiere() setzt Anfrage/Antwort fuer die Anzeige.
         $this->assertNull(Ideengenerator::letzteAnfrage());
         $this->assertNull(Ideengenerator::letzteAntwort());
     }

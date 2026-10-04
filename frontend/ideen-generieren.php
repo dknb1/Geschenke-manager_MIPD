@@ -1,9 +1,8 @@
 <?php
-// PHP-Session nur fuer den Zustimmungshinweis vor der LLM-Nutzung - bewusst session- statt
-// DB-gebunden: die Zustimmung gilt nur fuer diesen Browser/diese Sitzung, nicht dauerhaft fuer
-// alle, die die Anwendung nutzen (siehe Aenderungsprotokoll 2026-09-13).
+// Die Zustimmung zur Datenuebertragung gilt nur fuer diese Browser-Sitzung.
 session_start();
 
+require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../backend/models/Ideengenerator.php';
@@ -25,10 +24,11 @@ if ($id && $person === null) {
     $fehler = 'Die ausgewählte Person konnte nicht gefunden werden.';
 }
 
-// Anlass/Budget gelten nur fuer diese eine Anfrage (nicht gespeichert) und bleiben nach dem
-// Generieren ausgewaehlt. Nur Schluessel aus den festen Listen, siehe Ideengenerator.
+// Anlass nur aus der Auswahl dieser Person, Budget nur aus der festen Liste - so kommt kein
+// beliebiger Text in den Prompt.
+$anlassAuswahl = $person !== null ? Anlass::auswahlFuerIdeengenerierung((int) $id) : [];
 $anlass = $_POST['anlass'] ?? 'keiner';
-$anlass = is_string($anlass) && isset(Ideengenerator::ANLAESSE[$anlass]) ? $anlass : 'keiner';
+$anlass = is_string($anlass) && isset($anlassAuswahl[$anlass]) ? $anlass : 'keiner';
 $budget = $_POST['budget'] ?? 'egal';
 $budget = is_string($budget) && isset(Ideengenerator::BUDGETS[$budget]) ? $budget : 'egal';
 
@@ -50,16 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $person !== null) {
                 $vorschlaege = Ideengenerator::generiere(
                     $beispiele,
                     Interesse::bezeichnungen($interessen),
-                    $anlass,
+                    $anlass !== 'keiner' ? $anlassAuswahl[$anlass] : null,
                     $budget
                 );
                 $anfrageDebug = Ideengenerator::letzteAnfrage();
                 $antwortDebug = Ideengenerator::letzteAntwort();
 
                 if ($vorschlaege === null) {
-                    // Cooldown bewusst NUR bei Erfolg setzen - ein fehlgeschlagener Versuch
-                    // (z. B. Netzwerkfehler, Rate-Limit) soll nicht zusaetzlich dafuer
-                    // "bestrafen", dass man gleich nochmal versuchen will.
+                    // Wartezeit nur nach Erfolg, ein Fehlversuch soll nicht zusaetzlich bremsen.
                     $fehler = 'Die Ideengenerierung ist gerade nicht verfügbar. Bitte später erneut versuchen.';
                 } else {
                     Person::ideenGenerierungVermerken((int) $id);
@@ -99,8 +97,7 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
 
 <?php $navZurueck = $person !== null ? 'person-bearbeiten.php?id=' . (int) $id : 'index.php'; include 'includes/navbar.php'; ?>
 
-<div class="page-container">
-
+<?php /* Ohne aeusseren Rahmen, sonst Kasten im Kasten. */ ?>
     <?php if ($person === null): ?>
 
         <h1>Geschenkideen generieren</h1>
@@ -131,8 +128,6 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
             </form>
         <?php endif; ?>
 
-        <a href="index.php">Zurück zur Startseite</a>
-
     <?php else: ?>
 
         <h1>Geschenkideen generieren für <?= htmlspecialchars($person['name']) ?></h1>
@@ -144,8 +139,7 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
         <?php if ($vorschlaege === null): ?>
 
             <?php if (Ideengenerator::datengrundlageIstDuenn(count($beispiele), count($interessen))): ?>
-                <?php /* Ruecksprung zurueck auf diese Seite, damit man nach dem Speichern der
-                         Interessen direkt weitergenerieren kann (siehe Ruecksprung). */ ?>
+                <?php /* Nach dem Speichern der Interessen zurueck hierher. */ ?>
                 <div class="hinweis">
                     <p>
                         Für <?= htmlspecialchars($person['name']) ?> ist noch wenig bekannt
@@ -165,9 +159,10 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
                         <strong>Groq</strong> (Modell <code><?= htmlspecialchars(Ideengenerator::MODELL) ?></code>) übermittelt,
                         um drei neue Vorschläge zu erhalten: die Texte der bereits verschenkten,
                         fest zugeordneten und zuletzt angelegten offenen Geschenkideen dieser
-                        Person, ihre hinterlegten Interessen-Kategorien sowie der unten gewählte
-                        Anlass und das Budget. Nicht übertragen werden Name, Geburtsdatum bzw.
-                        Alter, Geschlecht, Details, Bilder und Links.
+                        Person, ihre hinterlegten Interessen-Kategorien, der Name des unten
+                        gewählten Anlasses (so wie er gespeichert ist) und das Budget. Nicht
+                        übertragen werden Name, Geburtsdatum bzw. Alter, Geschlecht, Details,
+                        Bilder und Links – außer sie stehen im Namen des gewählten Anlasses.
                         Die Zustimmung gilt nur für diese Browser-Sitzung.
                     </p>
                 </div>
@@ -178,12 +173,13 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
 
                 <label for="anlass">Anlass:</label>
                 <select id="anlass" name="anlass">
-                    <?php foreach (Ideengenerator::ANLAESSE as $schluessel => $bezeichnung): ?>
-                        <option value="<?= htmlspecialchars($schluessel) ?>" <?= $schluessel === $anlass ? 'selected' : '' ?>>
+                    <?php foreach ($anlassAuswahl as $schluessel => $bezeichnung): ?>
+                        <option value="<?= htmlspecialchars((string) $schluessel) ?>" <?= (string) $schluessel === $anlass ? 'selected' : '' ?>>
                             <?= htmlspecialchars($bezeichnung) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <p class="hinweis-klein">Der Name des gewählten Anlasses wird so, wie er hier steht, an Groq übertragen, auch wenn Namen oder andere persönliche Informationen enthalten sind.</p>
 
                 <label for="budget">Budget:</label>
                 <select id="budget" name="budget">
@@ -201,10 +197,10 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
 
         <?php else: ?>
 
-            <h2>Vorschläge</h2>
-            <p>Wähle aus, welche der Vorschläge gespeichert werden sollen.</p>
+            <form method="post" class="ideen-formular">
+                <h2>Vorschläge</h2>
+                <p class="hinweis-klein">Wähle aus, welche der Vorschläge gespeichert werden sollen.</p>
 
-            <form method="post">
                 <input type="hidden" name="person" value="<?= (int) $id ?>">
 
                 <?php foreach ($vorschlaege as $vorschlag): ?>
@@ -239,13 +235,8 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
         <?php endif; ?>
 
         <a href="ideen-generieren.php">Andere Person auswählen</a>
-        <a href="person-bearbeiten.php?id=<?= (int) $id ?>">
-            Zurück zu <?= htmlspecialchars($person['name']) ?>
-        </a>
 
     <?php endif; ?>
-
-</div>
 
 </body>
 </html>

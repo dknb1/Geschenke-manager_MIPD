@@ -4,15 +4,7 @@ class Datenbank
 {
     private static ?PDO $verbindung = null;
 
-    /**
-     * Spalten, die im Laufe des Projekts NACH der ersten Version einer Tabelle ergaenzt
-     * wurden. "CREATE TABLE IF NOT EXISTS" (siehe schema.sql) legt eine Tabelle nur an, wenn
-     * sie noch nicht existiert - es traegt bei einer bereits bestehenden Tabelle keine neuen
-     * Spalten nach. Bisher musste dafuer die komplette lokale Datenbankdatei geloescht werden,
-     * was jedes Mal alle echten Daten vernichtet hat. Stattdessen: fehlende Spalten hier
-     * eintragen, migriereFehlendeSpalten() unten ergaenzt sie per ALTER TABLE ADD COLUMN nach
-     * (bestehende Zeilen bleiben erhalten, neue Spalte wird mit ihrem DEFAULT-Wert befuellt).
-     */
+    /** Spalten, die nach der ersten Version dazukamen. Werden in bestehenden Datenbanken nachgetragen. */
     private const NACHTRAEGLICHE_SPALTEN = [
     'geschenkideen' => [
         'fuer_geburtstag' => 'INTEGER NOT NULL DEFAULT 0',
@@ -38,10 +30,7 @@ class Datenbank
         return self::$verbindung;
     }
 
-    /**
-     * Nur für Tests: setzt die Verbindung auf eine frische In-Memory-Datenbank zurück,
-     * damit jeder Testlauf isoliert von der echten Datenbank und von anderen Tests ist.
-     */
+    /** Fuer Tests: frische Datenbank im Speicher. */
     public static function fuerTests(): PDO
     {
         self::$verbindung = self::neueVerbindung(':memory:');
@@ -52,8 +41,7 @@ class Datenbank
     {
         $verbindung = new PDO('sqlite:' . $pfad);
         $verbindung->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        // Ohne dieses Pragma ignoriert SQLite REFERENCES/ON DELETE CASCADE stillschweigend
-        // (Fremdschluessel werden pro Verbindung, nicht global, aktiviert).
+        // Ohne dieses Pragma ignoriert SQLite Fremdschluessel und ON DELETE CASCADE.
         $verbindung->exec('PRAGMA foreign_keys = ON');
         $verbindung->exec(file_get_contents(__DIR__ . '/../../datenbank/schema.sql'));
         self::migriereFehlendeSpalten($verbindung);
@@ -62,12 +50,7 @@ class Datenbank
         return $verbindung;
     }
 
-    /**
-     * Ergaenzt Spalten aus NACHTRAEGLICHE_SPALTEN, falls sie an einer bereits bestehenden
-     * Tabelle noch fehlen (z. B. lokale Datenbankdatei von vor der jeweiligen Spalten-
-     * Einfuehrung) - ohne bestehende Zeilen/Daten anzutasten. Bei einer frisch von schema.sql
-     * angelegten Tabelle sind alle Spalten ohnehin schon vorhanden, hier passiert dann nichts.
-     */
+    /** Traegt fehlende Spalten nach, ohne vorhandene Daten anzufassen. */
     private static function migriereFehlendeSpalten(PDO $verbindung): void
     {
         foreach (self::NACHTRAEGLICHE_SPALTEN as $tabelle => $spalten) {
@@ -82,20 +65,8 @@ class Datenbank
     }
 
     /**
-     * Ersetzt die komplette Verknuepfung eines Datensatzes in einer N:M-Zwischentabelle
-     * (loeschen + neu anlegen statt Diff - die Mengen im Prototyp-Umfang sind klein). Gemeinsame
-     * Grundlage fuer Anlass::personenVerknuepfen() (anlass_personen) und
-     * Geschenkidee::anlaesseVerknuepfen() (geschenkidee_anlaesse), die vorher denselben
-     * DELETE+INSERT-Code jeweils eigenstaendig implementiert hatten, sowie
-     * Interesse::fuerPersonSetzen() (person_interessen - dort sind die "fremden IDs" die
-     * Text-Schluessel der festen Kategorienliste statt Zahlen).
-     *
-     * $tabelle/$eigeneSpalte/$fremdeSpalte werden direkt in die SQL-Strings eingesetzt (keine
-     * Prepared-Statement-Platzhalter fuer Tabellen-/Spaltennamen moeglich) - das ist hier
-     * unbedenklich, weil diese Werte ausschliesslich von den beiden Aufrufstellen im eigenen
-     * Code kommen, niemals aus Nutzereingaben (gleiches Vertrauensmodell wie bei
-     * migriereFehlendeSpalten() oben). $fremdeIds sind normale Werte und werden parametrisiert
-     * gebunden.
+     * Ersetzt alle Eintraege eines Datensatzes in einer Verknuepfungstabelle. Tabellen- und
+     * Spaltennamen kommen nur aus dem eigenen Code, nie aus Nutzereingaben.
      *
      * @param int[]|string[] $fremdeIds
      */
@@ -118,10 +89,7 @@ class Datenbank
         }
     }
 
-    /**
-     * Weihnachten ist ein fester Pflichtanlass (nicht personenbezogen,
-     * anders als Geburtstage). Wird nur einmal angelegt, falls noch nicht vorhanden.
-     */
+    /** Legt Weihnachten als Pflichtanlass an, falls es noch fehlt. */
     private static function seedStandardanlaesse(PDO $verbindung): void
     {
         $vorhanden = $verbindung

@@ -39,8 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $name = trim($_POST['name'] ?? '');
         $datum = trim($_POST['datum'] ?? '');
-        // Bei geschuetzten Anlaessen gibt es kein Wiederholung-Feld im Formular (siehe unten) -
-        // der bestehende Wert bleibt unangetastet, statt einen Pflichtfeldfehler auszuloesen.
+        // Pflichtanlaesse haben kein Wiederholungs-Feld, der alte Wert bleibt.
         $wiederholung = $istGeschuetzt
             ? ($anlass['wiederholt_jaehrlich'] ? 'ja' : 'nein')
             : ($_POST['wiederholung'] ?? '');
@@ -84,52 +83,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
     <?php endforeach; ?>
 
-    <form method="post">
+    <div class="abschnitte">
 
-        <input type="hidden" name="id" value="<?= (int) $id ?>">
+        <form method="post" class="ideen-formular">
 
-        <label for="name">Name des Anlasses:</label>
-        <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" required>
+            <h2>Angaben zum Anlass</h2>
 
-        <label for="datum">Datum:</label>
-        <input type="date" id="datum" name="datum" value="<?= htmlspecialchars($datum) ?>" required>
+            <input type="hidden" name="id" value="<?= (int) $id ?>">
 
-        <?php if ((int) $anlass['geschuetzt'] === 1): ?>
-            <p>Pflichtanlässe wie "<?= htmlspecialchars($anlass['name']) ?>" wiederholen sich fest
-                jährlich — das lässt sich nicht ändern.</p>
-        <?php else: ?>
-            <p>Wiederholt sich der Anlass?</p>
+            <label for="name">Name des Anlasses:</label>
+            <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" required>
 
-            <label>
-                <input type="radio" name="wiederholung" value="ja" <?= $wiederholung === 'ja' ? 'checked' : '' ?>>
-                Ja
-            </label>
+            <label for="datum">Datum:</label>
+            <input type="date" id="datum" name="datum" value="<?= htmlspecialchars($datum) ?>" required>
 
-            <label>
-                <input type="radio" name="wiederholung" value="nein" <?= $wiederholung === 'nein' ? 'checked' : '' ?>>
-                Nein
-            </label>
+            <?php if ((int) $anlass['geschuetzt'] === 1): ?>
+                <p class="hinweis-klein">Pflichtanlässe wie "<?= htmlspecialchars($anlass['name']) ?>" wiederholen sich fest
+                    jährlich — das lässt sich nicht ändern.</p>
+            <?php else: ?>
+                <p class="feld-titel">Wiederholt sich der Anlass?</p>
+
+                <label>
+                    <input type="radio" name="wiederholung" value="ja" <?= $wiederholung === 'ja' ? 'checked' : '' ?>>
+                    Ja
+                </label>
+
+                <label>
+                    <input type="radio" name="wiederholung" value="nein" <?= $wiederholung === 'nein' ? 'checked' : '' ?>>
+                    Nein
+                </label>
+            <?php endif; ?>
+
+            <?php if ((int) $anlass['geschuetzt'] === 1): ?>
+                <p class="hinweis-klein">Pflichtanlässe wie "<?= htmlspecialchars($anlass['name']) ?>" betreffen alle Personen
+                    gleichzeitig und können deshalb nicht einzelnen Personen zugeordnet werden.</p>
+            <?php else: ?>
+                <label for="person_ids">Personen (optional, Mehrfachauswahl möglich):</label>
+                <select id="person_ids" name="person_ids[]" multiple size="8">
+                    <?php foreach (Person::alle() as $p): ?>
+                        <option value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $personIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            <?php endif; ?>
+
+            <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
+
+        </form>
+
+        <?php /* Pflichtanlaesse koennen nicht geloescht werden, also gar kein Loesch-Kasten. */ ?>
+        <?php if ((int) $anlass['geschuetzt'] !== 1): ?>
+            <section class="kasten kasten-gefahr">
+
+                <h2>Anlass löschen</h2>
+
+                <p class="hinweis-klein">Entfernt den Anlass dauerhaft. Vorher kommt eine Sicherheitsabfrage.</p>
+
+                <button type="button" popovertarget="anlass-loeschen-bestaetigen" class="gefahr-button">Anlass löschen</button>
+
+            </section>
         <?php endif; ?>
 
-        <?php if ((int) $anlass['geschuetzt'] === 1): ?>
-            <p>Pflichtanlässe wie "<?= htmlspecialchars($anlass['name']) ?>" betreffen alle Personen
-                gleichzeitig und können deshalb nicht einzelnen Personen zugeordnet werden.</p>
-        <?php else: ?>
-            <label for="person_ids">Personen (optional, Mehrfachauswahl möglich):</label>
-            <select id="person_ids" name="person_ids[]" multiple size="8">
-                <?php foreach (Person::alle() as $p): ?>
-                    <option value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $personIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        <?php endif; ?>
+    </div>
 
-        <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>
+    <?php if ((int) $anlass['geschuetzt'] !== 1): ?>
+        <div id="anlass-loeschen-bestaetigen" popover class="bestaetigungs-fenster">
+            <div class="fenster-kopf">
+                <h2>„<?= htmlspecialchars($anlass['name']) ?>“ wirklich löschen?</h2>
+                <button class="schliessen"
+                        popovertarget="anlass-loeschen-bestaetigen"
+                        popovertargetaction="hide">
+                    ×
+                </button>
+            </div>
 
-        <button type="submit" name="aktion" value="loeschen">Anlass löschen</button>
+            <p>Das kann nicht rückgängig gemacht werden.</p>
 
-    </form>
-
-    <a href="<?= htmlspecialchars($zurueck) ?>">Zurück</a>
+            <form method="post" class="fenster-buttons">
+                <input type="hidden" name="id" value="<?= (int) $id ?>">
+                <button type="button" popovertarget="anlass-loeschen-bestaetigen" popovertargetaction="hide">Abbrechen</button>
+                <button type="submit" name="aktion" value="loeschen" class="gefahr-button">Ja, endgültig löschen</button>
+            </form>
+        </div>
+    <?php endif; ?>
 
 </body>
 

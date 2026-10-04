@@ -1,12 +1,22 @@
 <?php
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Person.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+
+// Von der Personenseite aus: Person vorauswaehlen und danach dorthin zurueck.
+$standardZurueck = 'anlaesse.php';
+$zurueck = Ruecksprung::ausAnfrage($standardZurueck);
 
 $fehler = [];
 $name = '';
 $datum = '';
 $wiederholung = '';
 $personIds = [];
+
+$vorausgewaehltePerson = Person::finden((int) filter_input(INPUT_GET, 'person', FILTER_VALIDATE_INT));
+if ($vorausgewaehltePerson !== null) {
+    $personIds = [(int) $vorausgewaehltePerson['id']];
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
@@ -26,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($fehler)) {
         Anlass::erstellen($name, $datum, $wiederholung === 'ja', $personIds);
-        header('Location: anlaesse.php');
+        header('Location: ' . $zurueck);
         exit;
     }
 }
@@ -44,14 +54,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
- <?php $navZurueck = 'anlaesse.php'; include 'includes/navbar.php'; ?>
+ <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
     <h1>Neuen Anlass erstellen</h1>
 
     <?php foreach ($fehler as $meldung): ?>
         <p class="fehler"><?= htmlspecialchars($meldung) ?></p>
     <?php endforeach; ?>
 
-    <form method="post">
+    <form method="post" class="ideen-formular">
 
         <label for="name">Name des Anlasses:</label>
         <input type="text" id="name" name="name" value="<?= htmlspecialchars($name) ?>" required>
@@ -59,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label for="datum">Datum:</label>
         <input type="date" id="datum" name="datum" value="<?= htmlspecialchars($datum) ?>" required>
 
-        <p>Wiederholt sich der Anlass?</p>
+        <p class="feld-titel">Wiederholt sich der Anlass?</p>
 
         <label>
             <input type="radio" name="wiederholung" value="ja" <?= $wiederholung === 'ja' ? 'checked' : '' ?>>
@@ -81,8 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit">Anlass erstellen</button>
 
     </form>
-
-    <a href="anlaesse.php">Zurück zu meinen Anlässen</a>
 
 </body>
 

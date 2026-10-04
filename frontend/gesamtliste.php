@@ -3,10 +3,7 @@ require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 
-// Gesamtliste: alle Personen mit allen zu ihnen gehoerenden Informationen (Anlaesse,
-// aktuelle Geschenkideen, vergangene Geschenke) auf einer einzigen, druckbaren HTML-Seite -
-// im Unterschied zu person-bearbeiten.php, das dieselben Informationen jeweils nur fuer
-// EINE Person zeigt (und zusaetzlich das Bearbeitungsformular enthaelt).
+// Alle Personen mit Anlaessen und Geschenken auf einer druckbaren Seite.
 $personen = Person::alle();
 ?>
 <!DOCTYPE html>
@@ -25,7 +22,8 @@ $personen = Person::alle();
 
     <?php include 'includes/navbar.php'; ?>
 
-    <div class="page-container">
+    <?php /* Ohne aeusseren Rahmen, jede Person ist ein eigener Kasten. */ ?>
+    <div>
 
         <h1>Gesamtliste</h1>
 
@@ -52,7 +50,7 @@ $personen = Person::alle();
             $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person);
             ?>
 
-            <section class="gesamtliste-person">
+            <section class="gesamtliste-person kasten">
 
                 <h2><?= htmlspecialchars($person['name']) ?></h2>
 

@@ -86,13 +86,9 @@ final class GeschenkideeTest extends ModelTestCase
 
     public function testIstGueltigerTextAkzeptiertAlltagswoerter(): void
     {
-        // "Union" ist ein zu gebraeuchliches Alltagswort und deshalb nicht mehr in der
-        // Denylist (siehe SqlDenylist). "UPDATE" bleibt dagegen
-        // bewusst denylisted, auch wenn "Update" ebenfalls ein Alltagswort ist - siehe
-        // testIstGueltigerTextLehntSqlSchluesselwoerterAb().
+        // "Union" ist erlaubt (Alltagswort), UPDATE bleibt gesperrt.
         $this->assertTrue(Geschenkidee::istGueltigerText('Ein Buch über die Europäische Union'));
-        // "Dropbox" enthaelt "DROP" nur als Teilzeichenkette, nicht als eigenstaendiges Wort -
-        // die \b-Wortgrenzen duerfen das nicht faelschlich ablehnen.
+        // "Dropbox" enthaelt DROP nur als Wortteil.
         $this->assertTrue(Geschenkidee::istGueltigerText('Ein Dropbox-Abo'));
     }
 
@@ -188,8 +184,7 @@ final class GeschenkideeTest extends ModelTestCase
 
     public function testAnlassNamenInklGeburtstagOhneFlagEnthaeltKeinenGeburtstag(): void
     {
-        // Eine Idee ist NICHT automatisch fuer den Geburtstag gedacht - z. B. ein reines
-        // Hochzeitsgeschenk oder eine Idee ganz ohne Anlass darf den Geburtstag nicht zeigen.
+        // Ohne Haekchen ist eine Idee nicht automatisch fuer den Geburtstag.
         Person::erstellen('Max', '1990-06-15', null, null);
         $personId = (int) $this->findePersonNachName('Max')['id'];
         Anlass::erstellen('Hochzeit', '2026-06-01', true, []);
@@ -231,8 +226,7 @@ final class GeschenkideeTest extends ModelTestCase
 
         Geschenkidee::aktualisieren($id, $personId, 'Idee für Tim', null, null, [], true);
 
-        // Tims Geburtstag ist der 1.1. (testPersonAnlegen()) - relativ zu $heute (1.6.2026)
-        // bereits vorbei, deshalb naechstes Vorkommen erst 2027.
+        // Tims Geburtstag (1.1.) ist am 1.6.2026 schon vorbei, also 2027.
         $this->assertContains('Geburtstag Tim - 01.01.2027', Geschenkidee::anlassNamenInklGeburtstag($id, $heute));
     }
 
@@ -257,8 +251,7 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertSame($hochzeitId, (int) $aktualisiert['geschenk_anlass_id']);
         $this->assertSame($inZweiMonaten, $aktualisiert['geschenk_datum']);
 
-        // Sobald fest, zeigt die Anzeige NUR noch den festen Anlass - Jubilaeum und Geburtstag
-        // verschwinden aus der Anzeige, obwohl die losen Tags in der DB unveraendert bleiben.
+        // Fest: nur noch der feste Anlass wird angezeigt, die losen Tags bleiben aber gespeichert.
         $erwartetesDatum = (new DateTimeImmutable($inZweiMonaten))->format('d.m.Y');
         $this->assertSame(['Hochzeit - ' . $erwartetesDatum], Geschenkidee::anlassNamenInklGeburtstag($id));
     }
@@ -283,10 +276,7 @@ final class GeschenkideeTest extends ModelTestCase
         $aktualisiert = Geschenkidee::finden($id);
         $this->assertNull($aktualisiert['geschenk_anlass_id']);
         $this->assertNull($aktualisiert['geschenk_datum']);
-        // Die urspruenglichen losen Tags (Hochzeit + Geburtstag) sind nie geloescht worden und
-        // tauchen jetzt automatisch wieder auf. Fixes $heute (weit in der Vergangenheit, aber
-        // vor $inZweiMonaten), damit Annas Geburtstagsdatum (1.1., testPersonAnlegen()) hier
-        // deterministisch ins naechste Jahr faellt statt vom tatsaechlichen Testdatum abzuhaengen.
+        // Die losen Tags tauchen wieder auf. Festes $heute, damit das Ergebnis nicht vom Testdatum abhaengt.
         $heute = new DateTimeImmutable('2020-06-01');
         $namen = Geschenkidee::anlassNamenInklGeburtstag($id, $heute);
         $this->assertContains('Hochzeit - ' . $erwartetesDatum, $namen);
@@ -302,9 +292,7 @@ final class GeschenkideeTest extends ModelTestCase
         Geschenkidee::erstellen($personId, 'Idee', null, null);
         $id = (int) $this->findeIdeeNachText('Idee')['id'];
 
-        // festMachen() wuerde ueber die Validierung in istGueltigerZielAnlass() normalerweise
-        // nicht fuer einen vergangenen Anlass aufgerufen - hier direkt das Datum simuliert, um
-        // die Anzeige-Logik fuer bereits vergangene feste Geschenke isoliert zu testen.
+        // Vergangenes Datum direkt gesetzt, um die Anzeige fuer vergangene Geschenke zu testen.
         Geschenkidee::festMachen($id, $anlassId);
 
         $this->assertSame(['Vergangene Feier - 01.01.2020 (vergangen)'], Geschenkidee::anlassNamenInklGeburtstag($id));
@@ -366,8 +354,7 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertNotNull($aktualisiert['geschenk_datum']);
 
         $this->assertTrue(Geschenkidee::istFest($aktualisiert));
-        // Nur noch der Geburtstag wird angezeigt, die lose Hochzeit-Verknuepfung verschwindet
-        // aus der Anzeige (bleibt aber in der DB, siehe zurueckAufOffen()-Test).
+        // Nur der Geburtstag wird angezeigt, die Hochzeit bleibt gespeichert.
         $erwartetesDatum = (new DateTimeImmutable($aktualisiert['geschenk_datum']))->format('d.m.Y');
         $this->assertSame(['Geburtstag Max - ' . $erwartetesDatum], Geschenkidee::anlassNamenInklGeburtstag($id));
     }
@@ -474,9 +461,7 @@ final class GeschenkideeTest extends ModelTestCase
         $verschenkteId = (int) $this->findeIdeeNachText('Bereits verschenkt')['id'];
 
         Geschenkidee::festMachen($festeId, $kommendeAnlassId);
-        // festMachen() wuerde einen bereits vergangenen Anlass ueber istGueltigerZielAnlass()
-        // normalerweise ablehnen - hier direkt aufgerufen, um gezielt einen "vergangenen"
-        // Datensatz zu erzeugen (analog zu testAnlassNamenInklGeburtstagZeigtVergangenBeiFestemVergangenemDatum()).
+        // Direkt aufgerufen, um einen vergangenen Datensatz zu erzeugen.
         Geschenkidee::festMachen($verschenkteId, $vergangenerAnlassId);
 
         $sortiert = Geschenkidee::sortiereNachStatus(Geschenkidee::vonPerson($personId), $heute);
@@ -517,8 +502,7 @@ final class GeschenkideeTest extends ModelTestCase
         $id = (int) $this->findeIdeeNachText('Letztes Jahr verschenkt')['id'];
         Geschenkidee::festMachenFuerGeburtstag($id);
 
-        // Ein Jahr nach dem eingefrorenen Geschenkdatum: der (letzte) Geburtstag liegt jetzt in
-        // der Vergangenheit und soll nicht mehr als "bekannte Idee" fuer den naechsten auftauchen.
+        // Ein Jahr spaeter: der Geburtstag ist vorbei und zaehlt nicht mehr.
         $einJahrSpaeter = (new DateTimeImmutable(Geschenkidee::finden($id)['geschenk_datum']))->modify('+1 year');
 
         $bekannt = Geschenkidee::bekannteIdeenFuerGeburtstag($personId, $einJahrSpaeter);
@@ -656,9 +640,7 @@ final class GeschenkideeTest extends ModelTestCase
 
         Geschenkidee::erstellen($personId, 'Idee', null, null);
         $id = (int) $this->findeIdeeNachText('Idee')['id'];
-        // festMachen() wuerde einen vergangenen Anlass normalerweise ueber
-        // istGueltigerZielAnlass() ablehnen - hier direkt aufgerufen, um gezielt eine bereits
-        // vergangene feste Zuordnung zu erzeugen (analog zu den Tests oben).
+        // Direkt aufgerufen, um eine vergangene feste Zuordnung zu erzeugen.
         Geschenkidee::festMachen($id, $anlassId);
 
         $status = Geschenkidee::statusNachPersonFuerAnlass($anlassId, new DateTimeImmutable('2026-01-01'));
@@ -698,9 +680,7 @@ final class GeschenkideeTest extends ModelTestCase
         $daten = Geschenkidee::datengrundlageFuerGenerierung($personId);
 
         $this->assertCount(5, $daten);
-        // Alle sechs wurden im selben Sekundentakt angelegt (erstellt_am hat keine
-        // Sub-Sekunden-Aufloesung) - es zaehlt hier nur, dass genau fuenf der sechs Ideen
-        // enthalten sind, nicht welche fuenf.
+        // Gleiche Sekunde angelegt: es zaehlt nur, dass es genau fuenf sind.
         $this->assertCount(5, array_intersect(
             $daten,
             ['Offene Idee 1', 'Offene Idee 2', 'Offene Idee 3', 'Offene Idee 4', 'Offene Idee 5', 'Offene Idee 6']

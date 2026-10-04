@@ -23,7 +23,7 @@ class Person
         return $person !== false ? $person : null;
     }
 
-    /** @return int ID der neu angelegten Person (z. B. um direkt ihre Interessen zu speichern) */
+    /** @return int ID der neuen Person */
     public static function erstellen(string $name, string $geburtsdatum, ?string $geschlecht, ?string $details): int
     {
         $pdo = Datenbank::verbinden();
@@ -58,11 +58,7 @@ class Person
         ]);
     }
 
-    /**
-     * Live berechnetes Alter aus dem Geburtsdatum, analog zu Anlass::naechstesVorkommen()
-     * keine gespeicherte Spalte - ein statisch eingetragenes Alter wuerde sonst mit der Zeit
-     * veralten, ohne dass es jemand nachtraegt. $heute ist fuer Tests injizierbar.
-     */
+    /** Alter wird immer aus dem Geburtsdatum berechnet, nicht gespeichert. */
     public static function alter(array $person, ?DateTimeImmutable $heute = null): int
     {
         $geburtsdatum = new DateTimeImmutable($person['geburtsdatum']);
@@ -71,13 +67,7 @@ class Person
         return $heute->diff($geburtsdatum)->y;
     }
 
-    /**
-     * Repraesentiert den Geburtstag dieser Person als Anlass-foermiges Array (gleiche
-     * 'datum'/'wiederholt_jaehrlich'-Struktur wie eine anlaesse-Zeile), damit er ueber
-     * Anlass::naechstesVorkommen() berechnet und in der Anlassliste einsortiert werden kann -
-     * ohne als eigene Zeile in der anlaesse-Tabelle dupliziert zu werden (siehe fachliche
-     * Dokumentation, Abschnitt "Pflichtanlässe").
-     */
+    /** Geburtstag in der Form eines Anlasses, damit er wie einer berechnet und angezeigt werden kann. */
     public static function geburtstagAlsAnlass(array $person): array
     {
         return [
@@ -92,15 +82,8 @@ class Person
     }
 
     /**
-     * Erzeugt (bzw. erneuert) den Zugriffsschluessel fuer den oeffentlichen Share-Link dieser
-     * Person (frontend/share.php?token=...). Ein erneuter Aufruf ueberschreibt einen bereits
-     * bestehenden Token und macht damit automatisch jeden zuvor verteilten Link ungueltig -
-     * es gibt bewusst nur EINEN Link pro Person, keine mehreren, einzeln widerrufbaren Links.
-     * 16 zufaellige Bytes (32 Hex-Zeichen) sind der einzige Zugriffsschutz auf diese Seite, da
-     * sie oeffentlich ohne Login erreichbar sein muss - deshalb kryptografisch sicherer Zufall
-     * (random_bytes()) statt z. B. einer fortlaufenden ID.
-     *
-     * @return string|null Der neue Token, oder null, wenn die Person nicht existiert.
+     * Erzeugt einen neuen Link-Schluessel; der alte Link wird damit ungueltig. Der Schluessel ist
+     * der einzige Schutz der oeffentlichen Seite, deshalb echter Zufall.
      */
     public static function shareTokenGenerieren(int $id): ?string
     {
@@ -117,11 +100,6 @@ class Person
         return $token;
     }
 
-    /**
-     * Findet die Person zu einem Share-Token - Gegenstueck zu shareTokenGenerieren(), genutzt
-     * von frontend/share.php. Liefert null sowohl bei leerem/unbekanntem Token als auch bei
-     * keiner Person (kein Unterschied in der Fehlermeldung noetig/gewollt).
-     */
     public static function findenPerShareToken(string $token): ?array
     {
         if ($token === '') {
@@ -136,12 +114,7 @@ class Person
         return $person !== false ? $person : null;
     }
 
-    /**
-     * Eigenes, striktes Cooldown pro Person zusaetzlich zum Groq-eigenen Rate-Limit (siehe
-     * Ideengenerator) - der gemeinsame API-Key teilt sich das Limit ueber alle Personen, ein
-     * versehentliches Mehrfachklicken auf "Ideen generieren" soll das nicht unnoetig
-     * ausschoepfen.
-     */
+    /** Wartezeit pro Person, damit Mehrfachklicks das gemeinsame Groq-Limit nicht aufbrauchen. */
     private const IDEEN_GENERIERUNG_COOLDOWN_SEKUNDEN = 60;
 
     public static function darfIdeenGenerieren(array $person, ?DateTimeImmutable $heute = null): bool
@@ -176,30 +149,42 @@ class Person
         return true;
     }
 
-    /**
-     * Erlaubt Buchstaben (inkl. Umlaute), Leerzeichen, Bindestriche und Apostrophe,
-     * damit z. B. "Anna-Lena" oder "O'Brien" moeglich sind, aber keine Zahlen,
-     * Anfuehrungszeichen oder SQL-Sonderzeichen.
-     */
+    /** Buchstaben, Leerzeichen, Bindestrich und Apostroph (z. B. "Anna-Lena", "O'Brien"). */
     public static function istGueltigerName(string $name): bool
     {
         return (bool) preg_match('/^[\p{L}\s\'\-]{1,100}$/u', $name);
     }
 
-    /**
-     * Geburtsdatum ist Pflichtfeld (analog zu Weihnachten als "obligatorischer" Anlass,
-     * siehe fachliche Dokumentation) - Leerstring wird deshalb hier bewusst NICHT akzeptiert,
-     * die Pflichtfeldpruefung erfolgt separat mit eigener Fehlermeldung wie bei istGueltigerName().
-     * Gueltiges Y-m-d-Datum, das nicht in der Zukunft liegt.
-     */
+    /** Gueltiges Datum, nicht in der Zukunft. Leer ist ungueltig (Pflichtfeld). */
     public static function istGueltigesGeburtsdatum(string $geburtsdatum): bool
     {
         $datum = DateTime::createFromFormat('Y-m-d', $geburtsdatum);
 
-        // Vergleich ueber den formatierten Datumsstring statt des DateTime-Objekts direkt:
-        // createFromFormat('Y-m-d', ...) uebernimmt fuer die nicht angegebene Uhrzeit die
-        // aktuelle Systemzeit, wodurch "heute" faelschlich als "in der Zukunft" durchfiele.
+        // Als Text vergleichen: createFromFormat() setzt sonst die aktuelle Uhrzeit, und "heute" waere zu spaet.
         return $datum !== false && $datum->format('Y-m-d') <= (new DateTime('today'))->format('Y-m-d');
+    }
+
+    /**
+     * Gibt es den Namen schon (ohne Gross-/Kleinschreibung)? Namen muessen eindeutig sein, weil
+     * Personen fast ueberall nur mit Namen angezeigt werden. In PHP verglichen, weil SQLite bei
+     * Umlauten nicht zuverlaessig ohne Gross-/Kleinschreibung vergleicht.
+     */
+    public static function nameIstVergeben(string $name, ?int $ausserId = null): bool
+    {
+        $gesucht = self::normalisierterName($name);
+
+        foreach (self::alle() as $person) {
+            if ((int) $person['id'] !== $ausserId && self::normalisierterName($person['name']) === $gesucht) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function normalisierterName(string $name): string
+    {
+        return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name)));
     }
 
     public static function istGueltigesGeschlecht(string $geschlecht): bool
@@ -212,13 +197,8 @@ class Person
         return strlen($details) <= 1000 && !SqlDenylist::enthaeltSchluesselwort($details);
     }
 
-    /**
-     * Buendelt die Validierung von Name/Geburtsdatum/Geschlecht/Details fuer erstellen()/
-     * aktualisieren() in einer Liste verstaendlicher Fehlermeldungen (leer = gueltig) -
-     * zentrale Stelle statt dieselbe Pruefungs-/Fehlertext-Kette in person-anlegen.php und
-     * person-bearbeiten.php dupliziert zu pflegen.
-     */
-    public static function validiereEingabe(string $name, string $geburtsdatum, string $geschlecht, string $details): array
+    /** Sammelt die Fehlermeldungen fuer das Personen-Formular. $ausserId = die gerade bearbeitete Person. */
+    public static function validiereEingabe(string $name, string $geburtsdatum, string $geschlecht, string $details, ?int $ausserId = null): array
     {
         $fehler = [];
 
@@ -226,6 +206,8 @@ class Person
             $fehler[] = 'Bitte einen Namen angeben.';
         } elseif (!self::istGueltigerName($name)) {
             $fehler[] = 'Der Name darf nur Buchstaben, Leerzeichen, Bindestriche und Apostrophe enthalten.';
+        } elseif (self::nameIstVergeben($name, $ausserId)) {
+            $fehler[] = 'Es gibt bereits eine Person mit diesem Namen. Bitte einen unterscheidbaren Namen wählen, z. B. mit Zusatz "Arbeit" oder "Uni".';
         }
 
         if ($geburtsdatum === '') {
