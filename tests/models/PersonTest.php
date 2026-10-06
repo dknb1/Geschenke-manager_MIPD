@@ -95,6 +95,15 @@ final class PersonTest extends ModelTestCase
         $this->assertSame(33, Person::alter($person, new DateTimeImmutable('2024-03-01')));
     }
 
+    public function testAlterAlsTextNurBeiEinemJahrImSingular(): void
+    {
+        $person = ['geburtsdatum' => '2024-05-05'];
+
+        $this->assertSame('0 Jahre', Person::alterAlsText($person, new DateTimeImmutable('2025-01-01')));
+        $this->assertSame('1 Jahr', Person::alterAlsText($person, new DateTimeImmutable('2025-05-05')));
+        $this->assertSame('2 Jahre', Person::alterAlsText($person, new DateTimeImmutable('2026-05-05')));
+    }
+
     public function testGeburtstagAlsAnlassLiefertAnlassFoermigesArray(): void
     {
         $person = ['id' => 5, 'name' => 'Max', 'geburtsdatum' => '1990-06-15'];

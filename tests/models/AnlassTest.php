@@ -180,7 +180,21 @@ final class AnlassTest extends ModelTestCase
 
         // Weihnachten (geschuetzt, betrifft fachlich alle Personen) taucht zusaetzlich zum
         // individuell verknuepften Anlass auf, "Anlass mit Anna" dagegen nicht.
-        $this->assertSame(['Anlass mit Max', 'Weihnachten'], $namenVonMax);
+        $this->assertSame(['Weihnachten', 'Anlass mit Max'], $namenVonMax);
+    }
+
+    public function testVonPersonInklGeschuetzteStelltPflichtanlassVorDieUebrigenChronologisch(): void
+    {
+        $id = Person::erstellen('Max', '1990-01-01', null, null);
+        $heute = new DateTimeImmutable('today');
+
+        Anlass::erstellen('Spaeter', $heute->modify('+20 days')->format('Y-m-d'), false, [$id]);
+        Anlass::erstellen('Frueher', $heute->modify('+5 days')->format('Y-m-d'), false, [$id]);
+
+        $namen = array_column(Anlass::vonPersonInklGeschuetzte($id), 'name');
+
+        // Weihnachten steht vorne, auch wenn "Frueher" und "Spaeter" vorher stattfinden.
+        $this->assertSame(['Weihnachten', 'Frueher', 'Spaeter'], $namen);
     }
 
     public function testGeschuetzterAnlassKannNichtGeloeschtWerden(): void

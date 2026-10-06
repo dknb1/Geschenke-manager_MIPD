@@ -15,6 +15,7 @@ $link = '';
 $bildLink = '';
 $fuerGeburtstag = false;
 $besorgt = false;
+$bereitsVerschenkt = false;
 $offeneAufgaben = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bildLink = trim($_POST['bild_link'] ?? '');
     $fuerGeburtstag = isset($_POST['fuer_geburtstag']);
     $besorgt = isset($_POST['besorgt']);
+    $bereitsVerschenkt = isset($_POST['bereits_verschenkt']);
     $offeneAufgaben = trim($_POST['offene_aufgaben'] ?? '');
 }
 
@@ -54,7 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $aktion === 'speichern') {
             $anlassIds,
             $fuerGeburtstag,
             $besorgt,
-            $offeneAufgaben !== '' ? $offeneAufgaben : null
+            $offeneAufgaben !== '' ? $offeneAufgaben : null,
+            $bereitsVerschenkt
         );
         header('Location: ' . ($zurueck !== '' ? $zurueck : 'person-bearbeiten.php?id=' . (int) $personId));
         exit;
@@ -160,6 +163,11 @@ $personen = Person::alle();
         <label>
             <input type="checkbox" name="besorgt" value="1" <?= $besorgt ? 'checked' : '' ?>>
             Geschenk bereits besorgt
+        </label>
+
+        <label>
+            <input type="checkbox" name="bereits_verschenkt" value="1" <?= $bereitsVerschenkt ? 'checked' : '' ?>>
+            Wurde bereits verschenkt
         </label>
 
         <label for="offene_aufgaben">Offene Aufgaben:</label>

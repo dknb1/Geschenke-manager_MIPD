@@ -49,12 +49,13 @@ class Geschenkidee
         array $anlassIds = [],
         bool $fuerGeburtstag = false,
         bool $besorgt = false,
-        ?string $offeneAufgaben = null
+        ?string $offeneAufgaben = null,
+        bool $bereitsVerschenkt = false
     ): void {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
-            'INSERT INTO geschenkideen (person_id, text, link, bild_link, fuer_geburtstag, besorgt, offene_aufgaben)
-             VALUES (:person_id, :text, :link, :bild_link, :fuer_geburtstag, :besorgt, :offene_aufgaben)'
+            'INSERT INTO geschenkideen (person_id, text, link, bild_link, fuer_geburtstag, besorgt, offene_aufgaben, bereits_verschenkt)
+             VALUES (:person_id, :text, :link, :bild_link, :fuer_geburtstag, :besorgt, :offene_aufgaben, :bereits_verschenkt)'
         );
         $stmt->execute([
             'person_id' => $personId,
@@ -64,6 +65,7 @@ class Geschenkidee
             'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
             'besorgt' => $besorgt ? 1 : 0,
             'offene_aufgaben' => $offeneAufgaben,
+            'bereits_verschenkt' => $bereitsVerschenkt ? 1 : 0,
         ]);
 
         self::anlaesseVerknuepfen($pdo, (int) $pdo->lastInsertId(), $anlassIds);
@@ -78,13 +80,15 @@ class Geschenkidee
         array $anlassIds = [],
         bool $fuerGeburtstag = false,
         bool $besorgt = false,
-        ?string $offeneAufgaben = null
+        ?string $offeneAufgaben = null,
+        bool $bereitsVerschenkt = false
     ): void {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
              SET person_id = :person_id, text = :text, link = :link, bild_link = :bild_link,
-                 fuer_geburtstag = :fuer_geburtstag, besorgt = :besorgt, offene_aufgaben = :offene_aufgaben
+                 fuer_geburtstag = :fuer_geburtstag, besorgt = :besorgt, offene_aufgaben = :offene_aufgaben,
+                 bereits_verschenkt = :bereits_verschenkt
              WHERE id = :id'
         );
         $stmt->execute([
@@ -95,6 +99,7 @@ class Geschenkidee
             'fuer_geburtstag' => $fuerGeburtstag ? 1 : 0,
             'besorgt' => $besorgt ? 1 : 0,
             'offene_aufgaben' => $offeneAufgaben,
+            'bereits_verschenkt' => $bereitsVerschenkt ? 1 : 0,
             'id' => $id,
         ]);
 

@@ -13,6 +13,7 @@ class Datenbank
         'geschenk_datum' => 'TEXT',
         'besorgt' => 'INTEGER NOT NULL DEFAULT 0',
         'offene_aufgaben' => 'TEXT',
+        'bereits_verschenkt' => 'INTEGER NOT NULL DEFAULT 0',
     ],
     'personen' => [
         'share_token' => 'TEXT',

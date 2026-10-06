@@ -30,7 +30,7 @@ $personen = Person::alle();
                 <span class="personen-name"><?= htmlspecialchars($person['name']) ?></span>
                 <span class="personen-info">
                     <?= htmlspecialchars((new DateTimeImmutable($person['geburtsdatum']))->format('d.m.Y')) ?>
-                    · <?= Person::alter($person) ?> Jahre
+                    · <?= Person::alterAlsText($person) ?>
                 </span>
             </a>
         <?php endforeach; ?>

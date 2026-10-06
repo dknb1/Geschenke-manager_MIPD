@@ -131,23 +131,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-erstellen.php?person=' . $id, 'person-bearbeiten.php?id=' . $id)) ?>" class="aktions-button">Neuen Anlass für <?= htmlspecialchars($name) ?> erstellen</a>
             <?php $geburtstagAlsAnlass = Person::geburtstagAlsAnlass($person); ?>
-            <p>
+            <?php /* Geburtstag hat keine eigene Bearbeiten-Seite, er wird oben im Formular geaendert. */ ?>
+            <a href="#geburtsdatum" class="anlass-verweis">
                 <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> -
                 <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
                 <strong>(Geburtstag)</strong>
-            </p>
-            <?php if (empty($verknuepfteAnlaesse)): ?>
+            </a>
+            <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
+                <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-bearbeiten.php?id=' . (int) $verknuepfterAnlass['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
+                    <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
+                    <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
+                    <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
+                        <strong>(Pflichtanlass)</strong>
+                    <?php endif; ?>
+                </a>
+            <?php endforeach; ?>
+            <?php /* Geburtstag und Weihnachten hat jede Person, "weitere" meint eigene Anlaesse. */ ?>
+            <?php if (Anlass::vonPerson($id) === []): ?>
                 <p>Keine weiteren Anlässe hinterlegt.</p>
-            <?php else: ?>
-                <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
-                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-bearbeiten.php?id=' . (int) $verknuepfterAnlass['id'], 'person-bearbeiten.php?id=' . $id)) ?>">
-                        <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
-                        <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
-                        <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
-                            <strong>(Pflichtanlass)</strong>
-                        <?php endif; ?>
-                    </a>
-                <?php endforeach; ?>
             <?php endif; ?>
         </section>
 

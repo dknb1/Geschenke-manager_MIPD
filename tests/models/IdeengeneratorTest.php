@@ -62,6 +62,11 @@ und Tom");
         $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], str_repeat('a', 150));
         $this->assertStringContainsString('Anlass: ' . str_repeat('a', 100) . '.', $prompt);
         $this->assertStringNotContainsString(str_repeat('a', 101), $prompt);
+
+        // Umlaute zaehlen als ein Zeichen und werden nicht mitten im Zeichen abgeschnitten.
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], str_repeat('ä', 150));
+        $this->assertStringContainsString('Anlass: ' . str_repeat('ä', 100) . '.', $prompt);
+        $this->assertStringNotContainsString(str_repeat('ä', 101), $prompt);
     }
 
     public function testDatengrundlageIstDuennOhneInteressenUndMitWenigenIdeen(): void

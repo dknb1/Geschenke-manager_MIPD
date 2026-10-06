@@ -90,7 +90,8 @@ class Ideengenerator
                 . implode("\n", array_map(fn (string $b) => '- ' . $b, $beispiele));
         }
 
-        $anlass = $anlass !== null ? mb_substr(trim(preg_replace('/\s+/u', ' ', $anlass)), 0, 100) : '';
+        // Auf 100 Zeichen kuerzen; Regex statt mb_substr(), damit es ohne die Erweiterung mbstring laeuft.
+        $anlass = $anlass !== null ? preg_replace('/^(.{100}).+$/us', '$1', trim(preg_replace('/\s+/u', ' ', $anlass))) : '';
         if ($anlass !== '') {
             $angaben[] = 'Anlass: ' . $anlass . '.';
         }

@@ -52,39 +52,39 @@ $personen = Person::alle();
 
             <section class="gesamtliste-person kasten">
 
-                <h2><?= htmlspecialchars($person['name']) ?></h2>
+                <h2><?= htmlspecialchars($person['name']) ?> (<?= Person::alterAlsText($person) ?>)</h2>
 
-                <p>
-                    Geburtstag:
-                    <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
-                    (<?= Person::alter($person) ?> Jahre)
-                    <?php if (!empty($person['details'])): ?>
-                        &ndash; <?= htmlspecialchars($person['details']) ?>
-                    <?php endif; ?>
-                </p>
+                <?php if (!empty($person['details'])): ?>
+                    <h3>Details</h3>
+
+                    <ul class="ideen-liste">
+                        <li><?= nl2br(htmlspecialchars($person['details'])) ?></li>
+                    </ul>
+                <?php endif; ?>
 
                 <h3>Anlässe</h3>
 
-                <p>
-                    <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> -
-                    <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
-                    <strong>(Geburtstag)</strong>
-                </p>
+                <?php /* Geburtstag als erster Kasten, gleich aussehend wie die uebrigen Anlaesse. */ ?>
+                <ul class="ideen-liste">
+                    <li>
+                        <?= htmlspecialchars($geburtstagAlsAnlass['name']) ?> -
+                        <?= htmlspecialchars(Anlass::naechstesVorkommen($geburtstagAlsAnlass)->format('d.m.Y')) ?>
+                        <strong>(Geburtstag)</strong>
+                    </li>
+                    <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
+                        <li>
+                            <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
+                            <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
+                            <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
+                                <strong>(Pflichtanlass)</strong>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
 
-                <?php if (empty($verknuepfteAnlaesse)): ?>
+                <?php /* Geburtstag und Weihnachten hat jede Person, "weitere" meint eigene Anlaesse. */ ?>
+                <?php if (Anlass::vonPerson((int) $person['id']) === []): ?>
                     <p>Keine weiteren Anlässe hinterlegt.</p>
-                <?php else: ?>
-                    <ul class="ideen-liste">
-                        <?php foreach ($verknuepfteAnlaesse as $verknuepfterAnlass): ?>
-                            <li>
-                                <?= htmlspecialchars($verknuepfterAnlass['name']) ?> -
-                                <?= htmlspecialchars(Anlass::naechstesVorkommen($verknuepfterAnlass)->format('d.m.Y')) ?>
-                                <?php if ((int) $verknuepfterAnlass['geschuetzt'] === 1): ?>
-                                    <strong>(Pflichtanlass)</strong>
-                                <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
                 <?php endif; ?>
 
                 <h3>Geschenkideen</h3>

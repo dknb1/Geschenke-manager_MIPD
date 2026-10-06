@@ -260,6 +260,8 @@ a.aktions-button:hover { background: var(--accent-dark); border-color: var(--acc
 .interessen-raster .anlass-checkbox { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-weight: normal; }
 /* Personenliste: Name links, Geburtsdatum und Alter rechts im selben Link statt als zweite Textzeile. */
 .personen-eintrag { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; }
+/* Linke Linie wie bei allen Listen-Kaesten (Anlaesse, Geschenkideen). */
+.personen-eintrag, .anlass-eintrag { border-left: 3px solid #819bb9; }
 .personen-name { font-weight: 600; }
 .personen-info { color: var(--muted); font-size: 14px; }
 /* Weihnachtsstatus in der Glocke: Namenslisten nur aufklappbar, damit viele Personen die Glocke nicht fluten. */
@@ -565,7 +567,8 @@ body:has(.personen-eintrag), body:has(.anlass-filter), body:has(.kasten) { max-w
 @media (max-width: 600px) { .kasten { padding: 22px 18px; } }
 @media print { .kasten { box-shadow: none; } }
 /* Unsichtbarer Standard-Button fuer Enter (siehe idee-bearbeiten.php), nur optisch versteckt. */
-.standard-button { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip-path: inset(50%); border: 0; opacity: 0; pointer-events: none; }
+/* Mit .ideen-formular, sonst gewinnt ".ideen-formular button" (volle Breite) und die Seite scrollt seitlich. */
+.standard-button, .ideen-formular button.standard-button { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip-path: inset(50%); border: 0; opacity: 0; pointer-events: none; }
 /* Fuer Aktionen, die etwas zuruecknehmen statt etwas Neues auszuloesen. */
 button.zweitrangig-button { background: white; color: var(--accent); }
 button.zweitrangig-button:hover { background: #f0f4f9; color: var(--accent-dark); }
@@ -605,6 +608,7 @@ body:has(.ideen-liste) { max-width: 880px; }
     box-sizing: border-box;
     padding: 22px 24px;
     border: 1px solid #dce3eb;
+    border-left: 3px solid #819bb9; /* gleiche Linie wie bei den Anlass-Verweisen */
     border-radius: 10px;
     background: white;
     color: #526176;
@@ -672,9 +676,10 @@ body:has(.ideen-liste) > h2,
     letter-spacing: -.02em;
 }
 
-/* Anlass-Verweise bleiben normale Links mit unverändertem Ziel. */
+/* Anlass-Verweise bleiben normale Links mit unverändertem Ziel. .anlass-verweis: Geburtstag, sieht gleich aus. */
 body:has(.ideen-liste) a[href^="anlass-bearbeiten.php"],
-body:has(.ideen-liste) a[href^="./anlass-bearbeiten.php"] {
+body:has(.ideen-liste) a[href^="./anlass-bearbeiten.php"],
+body:has(.ideen-liste) a.anlass-verweis {
     padding: 15px 18px;
     border: 1px solid #dce3eb;
     border-left: 3px solid #819bb9;
@@ -685,7 +690,8 @@ body:has(.ideen-liste) a[href^="./anlass-bearbeiten.php"] {
     line-height: 1.6;
 }
 body:has(.ideen-liste) a[href^="anlass-bearbeiten.php"]:hover,
-body:has(.ideen-liste) a[href^="./anlass-bearbeiten.php"]:hover {
+body:has(.ideen-liste) a[href^="./anlass-bearbeiten.php"]:hover,
+body:has(.ideen-liste) a.anlass-verweis:hover {
     border-color: #a8bbd1;
     background: #f0f4fa;
 }

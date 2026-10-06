@@ -253,17 +253,10 @@ class Anlass
         return $anlaesse;
     }
 
-    /** Anlaesse der Person inklusive Pflichtanlaesse wie Weihnachten. */
+    /** Anlaesse der Person inklusive Pflichtanlaesse wie Weihnachten: Pflichtanlaesse zuerst, der Rest chronologisch. */
     public static function vonPersonInklGeschuetzte(int $personId): array
     {
-        $anlaesse = array_merge(self::geschuetzte(), self::vonPerson($personId));
-
-        usort(
-            $anlaesse,
-            fn (array $a, array $b) => self::naechstesVorkommen($a) <=> self::naechstesVorkommen($b)
-        );
-
-        return $anlaesse;
+        return array_merge(self::geschuetzte(), self::vonPerson($personId));
     }
 
     /**

@@ -215,6 +215,19 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertContains('Geburtstag Anna - 20.03.2026', $namen);
     }
 
+    public function testBereitsVerschenktWirdGespeichertUndAktualisiert(): void
+    {
+        $personId = $this->testPersonAnlegen('Tim');
+        Geschenkidee::erstellen($personId, 'Schal', null, null, [], false, false, null, true);
+        $id = (int) $this->findeIdeeNachText('Schal')['id'];
+
+        $this->assertSame(1, (int) Geschenkidee::finden($id)['bereits_verschenkt']);
+
+        Geschenkidee::aktualisieren($id, $personId, 'Schal', null, null, [], false, false, null, false);
+
+        $this->assertSame(0, (int) Geschenkidee::finden($id)['bereits_verschenkt']);
+    }
+
     public function testAktualisierenAendertGeburtstagsFlag(): void
     {
         $heute = new DateTimeImmutable('2026-06-01');

@@ -76,7 +76,7 @@ class AnlassFilter
         $personIdsJeAnlass = $filter['person'] !== null
             ? array_column(Anlass::vonPerson($filter['person']), 'id')
             : [];
-        $suche = mb_strtolower($filter['suche']);
+        $suche = $filter['suche'];
 
         $ergebnis = [];
 
@@ -173,8 +173,11 @@ class AnlassFilter
             return true;
         }
 
+        // Regex mit /iu statt mb_strtolower(): findet "äpfel" auch in "Äpfel", ohne die Erweiterung mbstring.
+        $muster = '/' . preg_quote($suche, '/') . '/iu';
+
         foreach (array_merge([$name], $personen) as $text) {
-            if (mb_strpos(mb_strtolower($text), $suche) !== false) {
+            if (preg_match($muster, $text) === 1) {
                 return true;
             }
         }

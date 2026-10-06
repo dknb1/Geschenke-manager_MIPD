@@ -67,6 +67,14 @@ class Person
         return $heute->diff($geburtsdatum)->y;
     }
 
+    /** Alter mit Einheit: "1 Jahr", sonst "Jahre" (auch "0 Jahre"). */
+    public static function alterAlsText(array $person, ?DateTimeImmutable $heute = null): string
+    {
+        $alter = self::alter($person, $heute);
+
+        return $alter . ($alter === 1 ? ' Jahr' : ' Jahre');
+    }
+
     /** Geburtstag in der Form eines Anlasses, damit er wie einer berechnet und angezeigt werden kann. */
     public static function geburtstagAlsAnlass(array $person): array
     {
@@ -171,10 +179,11 @@ class Person
      */
     public static function nameIstVergeben(string $name, ?int $ausserId = null): bool
     {
-        $gesucht = self::normalisierterName($name);
+        // Regex mit /iu statt mb_strtolower(): vergleicht Umlaute ohne die Erweiterung mbstring.
+        $gesucht = '/^' . preg_quote(self::normalisierterName($name), '/') . '$/iu';
 
         foreach (self::alle() as $person) {
-            if ((int) $person['id'] !== $ausserId && self::normalisierterName($person['name']) === $gesucht) {
+            if ((int) $person['id'] !== $ausserId && preg_match($gesucht, self::normalisierterName($person['name'])) === 1) {
                 return true;
             }
         }
@@ -184,7 +193,7 @@ class Person
 
     private static function normalisierterName(string $name): string
     {
-        return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name)));
+        return trim(preg_replace('/\s+/u', ' ', $name));
     }
 
     public static function istGueltigesGeschlecht(string $geschlecht): bool

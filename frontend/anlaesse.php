@@ -103,7 +103,7 @@ $hierher = AnlassFilter::alsUrl($filter);
                     ? 'person-bearbeiten.php?id=' . (int) $anlass['person_id']
                     : 'anlass-bearbeiten.php?id=' . (int) $anlass['id'];
                 ?>
-                <a href="<?= htmlspecialchars(Ruecksprung::anhaengen($link, $hierher)) ?>">
+                <a href="<?= htmlspecialchars(Ruecksprung::anhaengen($link, $hierher)) ?>" class="anlass-eintrag">
                     <?= htmlspecialchars($anlass['name']) ?> - <?= htmlspecialchars($anlass['naechstes_vorkommen']->format('d.m.Y')) ?><?php if (!$anlass['ist_geburtstag'] && !empty($anlass['personen'])): ?> (<?= htmlspecialchars(implode(', ', $anlass['personen'])) ?>)<?php endif; ?>
                     <?php if ($anlass['ist_geburtstag']): ?>
                         <strong>(Geburtstag)</strong>
