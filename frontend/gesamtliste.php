@@ -2,6 +2,9 @@
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+
+$zurueck = Ruecksprung::ausAnfrage('index.php');
 
 // Alle Personen mit Anlaessen und Geschenken auf einer druckbaren Seite.
 $personen = Person::alle();
@@ -20,7 +23,7 @@ $personen = Person::alle();
 
 <body>
 
-    <?php include 'includes/navbar.php'; ?>
+    <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
 
     <?php /* Ohne aeusseren Rahmen, jede Person ist ein eigener Kasten. */ ?>
     <div>

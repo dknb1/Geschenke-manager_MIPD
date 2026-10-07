@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Interesse.php';
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+
+$zurueck = Ruecksprung::ausAnfrage('person-anzeigen.php');
 
 $fehler = [];
 $name = '';
@@ -44,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body>
- <?php $navZurueck = 'person-anzeigen.php'; include 'includes/navbar.php'; ?>
+ <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
 
     <h1>Person anlegen</h1>
 

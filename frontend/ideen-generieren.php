@@ -15,6 +15,9 @@ $id = filter_input(INPUT_GET, 'person', FILTER_VALIDATE_INT)
 $personen = Person::alle();
 $person = $id ? Person::finden((int) $id) : null;
 
+$standardZurueck = $person !== null ? 'person-bearbeiten.php?id=' . (int) $id : 'index.php';
+$zurueck = Ruecksprung::ausAnfrage($standardZurueck);
+
 $fehler = null;
 $vorschlaege = null;
 $anfrageDebug = null;
@@ -95,7 +98,7 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
 
 <body>
 
-<?php $navZurueck = $person !== null ? 'person-bearbeiten.php?id=' . (int) $id : 'index.php'; include 'includes/navbar.php'; ?>
+<?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
 
 <?php /* Ohne aeusseren Rahmen, sonst Kasten im Kasten. */ ?>
     <?php if ($person === null): ?>
@@ -112,6 +115,8 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
             <a href="person-anlegen.php">Person anlegen</a>
         <?php else: ?>
             <form method="get" action="ideen-generieren.php" class="ideen-formular">
+                <input type="hidden" name="zurueck" value="<?= htmlspecialchars(Ruecksprung::anhaengen('ideen-generieren.php', $zurueck)) ?>">
+
                 <label for="person">Person auswählen:</label>
 
                 <select id="person" name="person" required>

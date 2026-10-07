@@ -1,3 +1,6 @@
+<?php
+require_once __DIR__ . '/../backend/models/Ruecksprung.php';
+?>
 <!DOCTYPE html>
 <html lang="de">
 
@@ -21,8 +24,8 @@
                 <p>Personen anlegen sowie vorhandene Personen anzeigen und bearbeiten.</p>
 
                 <div class="startseite-aktionen">
-                    <a href="person-anlegen.php">Person anlegen</a>
-                    <a href="person-anzeigen.php">Personen anzeigen</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('person-anlegen.php', 'index.php')) ?>">Person anlegen</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('person-anzeigen.php', 'index.php')) ?>">Personen anzeigen</a>
                 </div>
             </section>
 
@@ -31,8 +34,8 @@
                 <p>Anlässe erstellen sowie bereits gespeicherte Anlässe anzeigen und bearbeiten.</p>
 
                 <div class="startseite-aktionen">
-                    <a href="anlass-erstellen.php">Anlass erstellen</a>
-                    <a href="anlaesse.php">Anlässe anzeigen</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlass-erstellen.php', 'index.php')) ?>">Anlass erstellen</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlaesse.php', 'index.php')) ?>">Anlässe anzeigen</a>
                 </div>
             </section>
 
@@ -41,8 +44,8 @@
                 <p>Neue Geschenkideen für eine Person erstellen oder Ideen generieren lassen.</p>
 
                 <div class="startseite-aktionen">
-                    <a href="idee-speichern.php">Geschenkidee erstellen</a>
-                    <a href="ideen-generieren.php">Geschenkideen generieren</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-speichern.php', 'index.php')) ?>">Geschenkidee erstellen</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('ideen-generieren.php', 'index.php')) ?>">Geschenkideen generieren</a>
                 </div>
             </section>
 
@@ -51,7 +54,7 @@
                 <p>Alle Personen, Anlässe, Geschenke und Ideen in einer gemeinsamen Übersicht anzeigen.</p>
 
                 <div class="startseite-aktionen">
-                    <a href="gesamtliste.php">Gesamtliste anzeigen</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('gesamtliste.php', 'index.php')) ?>">Gesamtliste anzeigen</a>
                 </div>
             </section>
 

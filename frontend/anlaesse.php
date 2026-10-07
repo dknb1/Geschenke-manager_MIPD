@@ -12,6 +12,7 @@ $monate = AnlassFilter::nachMonatGruppiert($anlaesse);
 
 // Ruecksprungziel fuer die Links, damit der Filter nach dem Bearbeiten erhalten bleibt.
 $hierher = AnlassFilter::alsUrl($filter);
+$zurueck = Ruecksprung::ausAnfrage('index.php');
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -27,7 +28,7 @@ $hierher = AnlassFilter::alsUrl($filter);
 
 <body>
 
- <?php include 'includes/navbar.php'; ?>
+ <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
 
     <h1>Meine Anlässe</h1>
 
@@ -37,6 +38,7 @@ $hierher = AnlassFilter::alsUrl($filter);
              (abgewaehlte Haekchen fehlen sonst einfach). */ ?>
     <form method="get" class="anlass-filter kasten">
         <input type="hidden" name="filter" value="1">
+        <input type="hidden" name="zurueck" value="<?= htmlspecialchars($zurueck) ?>">
 
         <div class="anlass-filter-felder">
             <label>
@@ -82,7 +84,7 @@ $hierher = AnlassFilter::alsUrl($filter);
         <div class="anlass-filter-aktionen">
             <button type="submit">Filtern</button>
             <?php if ($filterAktiv): ?>
-                <a href="anlaesse.php">Filter zurücksetzen</a>
+                <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('anlaesse.php', $zurueck)) ?>">Filter zurücksetzen</a>
             <?php endif; ?>
         </div>
     </form>

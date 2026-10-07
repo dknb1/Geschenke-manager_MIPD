@@ -5,7 +5,7 @@ require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 
 // Nach dem Speichern zurueck zur aufrufenden Seite, sonst zur gewaehlten Person.
-$zurueck = Ruecksprung::ausAnfrage('');
+$zurueck = Ruecksprung::ausAnfrage('index.php');
 
 $fehler = [];
 $aktion = $_POST['aktion'] ?? '';
@@ -80,7 +80,7 @@ $personen = Person::alle();
 
 <body>
 
-    <?php if ($zurueck !== '') { $navZurueck = $zurueck; } include 'includes/navbar.php'; ?>
+    <?php $navZurueck = $zurueck; include 'includes/navbar.php'; ?>
 
     <h1>Geschenkidee erstellen</h1>
 
