@@ -41,11 +41,11 @@ require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 
             <section class="startseite-karte">
                 <h2>Geschenke und Ideen</h2>
-                <p>Neue Geschenkideen für eine Person erstellen oder Ideen generieren lassen.</p>
+                <p>Geschenkideen erstellen sowie alle Ideen und Geschenke anzeigen, filtern und neue Ideen generieren lassen.</p>
 
                 <div class="startseite-aktionen">
                     <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('idee-speichern.php', 'index.php')) ?>">Geschenkidee erstellen</a>
-                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('ideen-generieren.php', 'index.php')) ?>">Geschenkideen generieren</a>
+                    <a href="<?= htmlspecialchars(Ruecksprung::anhaengen('geschenkideen.php', 'index.php')) ?>">Geschenkideen anzeigen</a>
                 </div>
             </section>
 

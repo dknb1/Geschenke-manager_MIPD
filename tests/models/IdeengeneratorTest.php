@@ -29,6 +29,20 @@ final class IdeengeneratorTest extends TestCase
         $this->assertStringNotContainsString("\r", $prompt);
     }
 
+    public function testPromptAufbauenUebernimmtAltersgruppeNurAusDerFestenListe(): void
+    {
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], null, 'egal', 'kind');
+        $this->assertStringContainsString('Altersgruppe: Kind (4 bis 12 Jahre).', $prompt);
+
+        $this->assertStringNotContainsString('Altersgruppe:', Ideengenerator::promptAufbauen(['Kochbuch']));
+        $this->assertStringNotContainsString('Altersgruppe:', Ideengenerator::promptAufbauen(['Kochbuch'], [], null, 'egal', 'keine'));
+
+        // Manipulierter Wert (z. B. ein genaues Alter) kommt nicht in den Prompt.
+        $prompt = Ideengenerator::promptAufbauen(['Kochbuch'], [], null, 'egal', '7 Jahre');
+        $this->assertStringNotContainsString('Altersgruppe:', $prompt);
+        $this->assertStringNotContainsString('7 Jahre', $prompt);
+    }
+
     public function testAntwortValidierenVereinheitlichtGeschuetzteBindestricheUndLeerzeichen(): void
     {
         $vorschlaege = Ideengenerator::antwortValidieren(

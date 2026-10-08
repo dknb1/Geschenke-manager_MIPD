@@ -4,7 +4,7 @@ require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 
-// Nach dem Speichern zurueck zur aufrufenden Seite, sonst zur gewaehlten Person.
+// Nach dem Speichern zurueck zur aufrufenden Seite (Startseite oder Person), sonst zur Startseite.
 $zurueck = Ruecksprung::ausAnfrage('index.php');
 
 $fehler = [];
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $aktion === 'speichern') {
             $offeneAufgaben !== '' ? $offeneAufgaben : null,
             $bereitsVerschenkt
         );
-        header('Location: ' . ($zurueck !== '' ? $zurueck : 'person-bearbeiten.php?id=' . (int) $personId));
+        header('Location: ' . $zurueck);
         exit;
     }
 }
@@ -169,6 +169,7 @@ $personen = Person::alle();
             <input type="checkbox" name="bereits_verschenkt" value="1" <?= $bereitsVerschenkt ? 'checked' : '' ?>>
             Wurde bereits verschenkt
         </label>
+        <p class="hinweis-klein">Für Geschenke, die die Person schon einmal bekommen hat. Sie stehen dann direkt unter „Vergangene Geschenke“ und helfen bei der Ideengenerierung.</p>
 
         <label for="offene_aufgaben">Offene Aufgaben:</label>
         <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>

@@ -118,12 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="hinweis-klein">Pflichtanlässe wie "<?= htmlspecialchars($anlass['name']) ?>" betreffen alle Personen
                     gleichzeitig und können deshalb nicht einzelnen Personen zugeordnet werden.</p>
             <?php else: ?>
-                <label for="person_ids">Personen (optional, Mehrfachauswahl möglich):</label>
-                <select id="person_ids" name="person_ids[]" multiple size="8">
-                    <?php foreach (Person::alle() as $p): ?>
-                        <option value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $personIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <?php include 'includes/personen-auswahl.php'; ?>
             <?php endif; ?>
 
             <button type="submit" name="aktion" value="speichern">Änderungen speichern</button>

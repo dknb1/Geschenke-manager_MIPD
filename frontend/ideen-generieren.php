@@ -27,13 +27,15 @@ if ($id && $person === null) {
     $fehler = 'Die ausgewählte Person konnte nicht gefunden werden.';
 }
 
-// Anlass nur aus der Auswahl dieser Person, Budget nur aus der festen Liste - so kommt kein
-// beliebiger Text in den Prompt.
+// Anlass nur aus der Auswahl dieser Person, Budget und Altersgruppe nur aus der festen Liste -
+// so kommt kein beliebiger Text in den Prompt.
 $anlassAuswahl = $person !== null ? Anlass::auswahlFuerIdeengenerierung((int) $id) : [];
 $anlass = $_POST['anlass'] ?? 'keiner';
 $anlass = is_string($anlass) && isset($anlassAuswahl[$anlass]) ? $anlass : 'keiner';
 $budget = $_POST['budget'] ?? 'egal';
 $budget = is_string($budget) && isset(Ideengenerator::BUDGETS[$budget]) ? $budget : 'egal';
+$altersgruppe = $_POST['altersgruppe'] ?? 'keine';
+$altersgruppe = is_string($altersgruppe) && isset(Ideengenerator::ALTERSGRUPPEN[$altersgruppe]) ? $altersgruppe : 'keine';
 
 $beispiele = $person !== null ? Geschenkidee::datengrundlageFuerGenerierung((int) $id) : [];
 $interessen = $person !== null ? Interesse::vonPerson((int) $id) : [];
@@ -54,7 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $person !== null) {
                     $beispiele,
                     Interesse::bezeichnungen($interessen),
                     $anlass !== 'keiner' ? $anlassAuswahl[$anlass] : null,
-                    $budget
+                    $budget,
+                    $altersgruppe
                 );
                 $anfrageDebug = Ideengenerator::letzteAnfrage();
                 $antwortDebug = Ideengenerator::letzteAntwort();
@@ -165,8 +168,9 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
                         um drei neue Vorschläge zu erhalten: die Texte der bereits verschenkten,
                         fest zugeordneten und zuletzt angelegten offenen Geschenkideen dieser
                         Person, ihre hinterlegten Interessen-Kategorien, der Name des unten
-                        gewählten Anlasses (so wie er gespeichert ist) und das Budget. Nicht
-                        übertragen werden Name, Geburtsdatum bzw. Alter, Geschlecht, Details,
+                        gewählten Anlasses (so wie er gespeichert ist), das Budget und, falls
+                        ausgewählt, die Altersgruppe. Nicht
+                        übertragen werden Name, Geburtsdatum bzw. genaues Alter, Geschlecht, Details,
                         Bilder und Links – außer sie stehen im Namen des gewählten Anlasses.
                         Die Zustimmung gilt nur für diese Browser-Sitzung.
                     </p>
@@ -184,9 +188,9 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="hinweis-klein">Der Name des gewählten Anlasses wird so, wie er hier steht, an Groq übertragen, auch wenn Namen oder andere persönliche Informationen enthalten sind.</p>
+                <p class="hinweis-klein">Der Name des gewählten Anlasses wird wie angezeigt an die KI übertragen. Es sollten deshalb keine persönlichen Informationen im Namen enthalten sein.</p>
 
-                <label for="budget">Budget:</label>
+                <label for="budget">Budget (optional):</label>
                 <select id="budget" name="budget">
                     <?php foreach (Ideengenerator::BUDGETS as $schluessel => $bezeichnung): ?>
                         <option value="<?= htmlspecialchars($schluessel) ?>" <?= $schluessel === $budget ? 'selected' : '' ?>>
@@ -194,6 +198,16 @@ $zugestimmt = !empty($_SESSION['ideen_generierung_zugestimmt']);
                         </option>
                     <?php endforeach; ?>
                 </select>
+
+                <label for="altersgruppe">Altersgruppe (optional):</label>
+                <select id="altersgruppe" name="altersgruppe">
+                    <?php foreach (Ideengenerator::ALTERSGRUPPEN as $schluessel => $bezeichnung): ?>
+                        <option value="<?= htmlspecialchars($schluessel) ?>" <?= $schluessel === $altersgruppe ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($bezeichnung) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="hinweis-klein">Nur die gewählte Gruppe wird übertragen, nie das genaue Alter. Hilft z. B. bei Kindern, unpassende Vorschläge zu vermeiden.</p>
 
                 <button type="submit" name="aktion" value="generieren">
                     <?= $zugestimmt ? 'Ideen generieren' : 'Verstanden, Ideen generieren' ?>

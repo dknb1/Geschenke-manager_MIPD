@@ -121,7 +121,7 @@ class Geschenkidee
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
              SET geschenk_anlass_id = :anlass_id, geschenk_fuer_geburtstag = 0,
-                 geschenk_datum = :geschenk_datum
+                 geschenk_datum = :geschenk_datum, bereits_verschenkt = 0
              WHERE id = :id'
         );
         $stmt->execute([
@@ -148,7 +148,7 @@ class Geschenkidee
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
              SET geschenk_anlass_id = NULL, geschenk_fuer_geburtstag = 1,
-                 geschenk_datum = :geschenk_datum
+                 geschenk_datum = :geschenk_datum, bereits_verschenkt = 0
              WHERE id = :id'
         );
         $stmt->execute([
@@ -176,7 +176,7 @@ class Geschenkidee
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
              SET geschenk_anlass_id = :anlass_id, geschenk_fuer_geburtstag = 0,
-                 geschenk_datum = :geschenk_datum, besorgt = 1
+                 geschenk_datum = :geschenk_datum, besorgt = 1, bereits_verschenkt = 0
              WHERE id = :id'
         );
         $stmt->execute([
@@ -210,7 +210,7 @@ class Geschenkidee
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
              SET geschenk_anlass_id = NULL, geschenk_fuer_geburtstag = 1,
-                 geschenk_datum = :geschenk_datum, besorgt = 1
+                 geschenk_datum = :geschenk_datum, besorgt = 1, bereits_verschenkt = 0
              WHERE id = :id'
         );
         $stmt->execute([
@@ -234,17 +234,12 @@ class Geschenkidee
         $vergangen = [];
 
         foreach ($ideen as $idee) {
-            if (!self::istFest($idee)) {
-                $offen[] = $idee;
-                continue;
-            }
-
-            $istVergangen = !empty($idee['geschenk_datum']) && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
-
-            if ($istVergangen) {
+            if (self::istVergangen($idee, $heute)) {
                 $vergangen[] = $idee;
-            } else {
+            } elseif (self::istFest($idee)) {
                 $fest[] = $idee;
+            } else {
+                $offen[] = $idee;
             }
         }
 
@@ -281,6 +276,10 @@ class Geschenkidee
         return array_values(array_filter(
             self::vonPerson($personId),
             function (array $idee) use ($heute) {
+                if (self::istBereitsVerschenkt($idee)) {
+                    return false;
+                }
+
                 if (self::istFest($idee)) {
                     return (int) $idee['geschenk_fuer_geburtstag'] === 1
                         && !empty($idee['geschenk_datum'])
@@ -316,11 +315,7 @@ class Geschenkidee
                 continue;
             }
 
-            $istVergangen = $istFest
-                && !empty($idee['geschenk_datum'])
-                && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
-
-            if ($istVergangen) {
+            if (self::istVergangen($idee, $heute)) {
                 continue;
             }
 
@@ -385,7 +380,8 @@ class Geschenkidee
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->prepare(
             'UPDATE geschenkideen
-             SET geschenk_anlass_id = NULL, geschenk_fuer_geburtstag = 0, geschenk_datum = NULL
+             SET geschenk_anlass_id = NULL, geschenk_fuer_geburtstag = 0, geschenk_datum = NULL,
+                 bereits_verschenkt = 0
              WHERE id = :id'
         );
         $stmt->execute(['id' => $id]);
@@ -394,6 +390,26 @@ class Geschenkidee
     public static function istFest(array $idee): bool
     {
         return $idee['geschenk_anlass_id'] !== null || (int) $idee['geschenk_fuer_geburtstag'] === 1;
+    }
+
+    /** Per Haken als verschenkt markiert, ohne bekannten Anlass oder Datum. */
+    public static function istBereitsVerschenkt(array $idee): bool
+    {
+        return (int) ($idee['bereits_verschenkt'] ?? 0) === 1;
+    }
+
+    /** Vergangen ist, was per Haken verschenkt wurde oder fest zu einem vergangenen Termin gehoert. */
+    public static function istVergangen(array $idee, ?DateTimeImmutable $heute = null): bool
+    {
+        if (self::istBereitsVerschenkt($idee)) {
+            return true;
+        }
+
+        $heute ??= new DateTimeImmutable('today');
+
+        return self::istFest($idee)
+            && !empty($idee['geschenk_datum'])
+            && new DateTimeImmutable($idee['geschenk_datum']) < $heute;
     }
 
     /** Fest zuordnen geht nur fuer Anlaesse, die noch bevorstehen. */
@@ -476,6 +492,11 @@ class Geschenkidee
             $namenMitDatum = $name . ' - ' . $datum->format('d.m.Y');
 
             return [$namenMitDatum . ($istVergangen ? ' (vergangen)' : '')];
+        }
+
+        // Anlass-Tags gelten nur fuer kommende Geschenke, beim Haken bleiben sie unsichtbar.
+        if (self::istBereitsVerschenkt($idee)) {
+            return [];
         }
 
         $namen = array_map(

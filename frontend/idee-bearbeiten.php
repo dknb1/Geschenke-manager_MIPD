@@ -162,6 +162,8 @@ if ($istFest) {
         : (Anlass::finden((int) $idee['geschenk_anlass_id'])['name'] ?? null);
 }
 $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) < new DateTimeImmutable('today');
+// Gespeicherter Stand, nicht der Haken im gerade abgeschickten Formular.
+$istVerschenktOhneTermin = !$istFest && Geschenkidee::istBereitsVerschenkt($idee);
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -210,10 +212,10 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
             <label>Weitere Anlässe (optional):</label>
 
-            <?php if ($istFest): ?>
+            <?php if ($istFest || $istVerschenktOhneTermin): ?>
 
-                <?php /* Bei fester Zuordnung sind die Tags ausgeblendet, werden aber unveraendert weitergegeben. */ ?>
-                <p class="hinweis">Ausgeblendet, solange diese Idee fest zugeordnet ist.</p>
+                <?php /* Bei fester Zuordnung oder verschenkt sind die Tags ausgeblendet, werden aber unveraendert weitergegeben. */ ?>
+                <p class="hinweis"><?= $istFest ? 'Ausgeblendet, solange diese Idee fest zugeordnet ist.' : 'Ausgeblendet, solange diese Idee als verschenkt markiert ist.' ?></p>
                 <?php foreach ($anlassIds as $gewaehlteAnlassId): ?>
                     <input type="hidden" name="anlass_ids[]" value="<?= (int) $gewaehlteAnlassId ?>">
                 <?php endforeach; ?>
@@ -290,6 +292,7 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
                 <input type="checkbox" name="bereits_verschenkt" value="1" <?= $bereitsVerschenkt ? 'checked' : '' ?>>
                 Wurde bereits verschenkt
             </label>
+            <p class="hinweis-klein">Ohne Anlass und Datum, steht dann direkt unter „Vergangene Geschenke“.</p>
 
             <label for="offene_aufgaben">Offene Aufgaben:</label>
             <textarea id="offene_aufgaben" name="offene_aufgaben" maxlength="1000"><?= htmlspecialchars($offeneAufgaben) ?></textarea>
@@ -300,9 +303,14 @@ $festIstVergangen = $istFest && new DateTimeImmutable($idee['geschenk_datum']) <
 
         <section class="ideen-formular">
 
-            <h2><?= !$istFest ? 'Als Geschenk festlegen' : ($festIstVergangen ? 'Vergangenes Geschenk' : 'Festgelegtes Geschenk') ?></h2>
+            <h2><?= $istVerschenktOhneTermin || $festIstVergangen ? 'Vergangenes Geschenk' : ($istFest ? 'Festgelegtes Geschenk' : 'Als Geschenk festlegen') ?></h2>
 
-            <?php if ($istFest): ?>
+            <?php if ($istVerschenktOhneTermin): ?>
+                <p>Als bereits verschenkt markiert, ohne Anlass und Datum.</p>
+                <p class="hinweis-klein">Aufheben macht das Geschenk wieder zu einer offenen Idee.</p>
+
+                <button type="submit" name="aktion" value="offen_setzen" class="zweitrangig-button">Wieder zur offenen Idee machen</button>
+            <?php elseif ($istFest): ?>
                 <p>
                     Fest zugeordnet zu: <strong><?= htmlspecialchars($festName) ?></strong>
                     am <?= htmlspecialchars((new DateTimeImmutable($idee['geschenk_datum']))->format('d.m.Y')) ?>

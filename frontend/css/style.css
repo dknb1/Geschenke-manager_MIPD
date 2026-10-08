@@ -253,11 +253,13 @@ a.aktions-button:hover { background: var(--accent-dark); border-color: var(--acc
 .anlass-filter-aktionen { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .anlass-filter-aktionen button, .anlass-filter-aktionen a { margin: 0; }
 .anlass-filter-treffer { color: var(--muted); }
-.interessen-auswahl { margin: 8px 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; }
-.interessen-auswahl legend { padding: 0 6px; font-weight: 600; }
+.interessen-auswahl, .personen-auswahl { margin: 8px 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; }
+.interessen-auswahl legend, .personen-auswahl legend { padding: 0 6px; font-weight: 600; }
+/* Personenliste bleibt auch bei vielen Kontakten kurz, gescrollt wird im Kasten. */
+.personen-raster { max-height: 230px; overflow-y: auto; }
 .hinweis-klein { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
-.interessen-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 16px; }
-.interessen-raster .anlass-checkbox { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-weight: normal; }
+.interessen-raster, .personen-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 16px; }
+.interessen-raster .anlass-checkbox, .personen-raster .anlass-checkbox { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-weight: normal; }
 /* Personenliste: Name links, Geburtsdatum und Alter rechts im selben Link statt als zweite Textzeile. */
 .personen-eintrag { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; }
 /* Linke Linie wie bei allen Listen-Kaesten (Anlaesse, Geschenkideen). */
@@ -473,16 +475,6 @@ body:has(.ideen-formular) { max-width: 880px; }
     background-color: white;
 }
 
-/* Mehrfachauswahl erhält genügend Höhe; die native Bedienung bleibt bestehen. */
-.ideen-formular select[multiple] {
-    height: auto;
-    min-height: 132px;
-    padding: 6px;
-    background-color: #fbfcfe;
-}
-.ideen-formular select[multiple] option { padding: 9px 12px; border-radius: 4px; }
-.ideen-formular select[multiple] option:checked { background-color: #dce8f6; color: #234873; font-weight: 600; }
-
 /* Checkboxen dürfen nicht die für Textfelder gesetzte volle Breite übernehmen. */
 .ideen-formular input[type="checkbox"],
 .ideen-formular input[type="radio"] {
@@ -561,7 +553,8 @@ body:has(.ideen-formular) { max-width: 880px; }
 .kasten .ideen-liste { margin: 0; gap: 12px; }
 .kasten .ideen-liste > li { box-shadow: none; background: #fbfcfe; }
 /* Interessen-Haekchen im Formular kompakt statt als einzelne Kaesten. */
-.ideen-formular .interessen-raster label:has(input[type="checkbox"]) { padding: 6px 4px; border: 0; background: transparent; }
+.ideen-formular .interessen-raster label:has(input[type="checkbox"]),
+.ideen-formular .personen-raster label:has(input[type="checkbox"]) { padding: 6px 4px; border: 0; background: transparent; }
 /* Unterseiten 880px breit, nur die Startseite breiter. */
 body:has(.personen-eintrag), body:has(.anlass-filter), body:has(.kasten) { max-width: 880px; }
 @media (max-width: 600px) { .kasten { padding: 22px 18px; } }

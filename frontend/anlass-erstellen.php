@@ -81,12 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Nein
         </label>
 
-        <label for="person_ids">Personen (optional, Mehrfachauswahl möglich):</label>
-        <select id="person_ids" name="person_ids[]" multiple size="8">
-            <?php foreach (Person::alle() as $p): ?>
-                <option value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $personIds, true) ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
-            <?php endforeach; ?>
-        </select>
+        <?php include 'includes/personen-auswahl.php'; ?>
 
         <button type="submit">Anlass erstellen</button>
 

@@ -3,8 +3,8 @@
 require_once __DIR__ . '/../config/Env.php';
 
 /**
- * Geschenkideen per KI (Groq). Geschickt werden nur Ideen-Texte, Interessen, Anlassname und
- * Budget, keine weiteren Personendaten. Prompt-Aufbau und Antwortpruefung sind ohne Netzwerk
+ * Geschenkideen per KI (Groq). Geschickt werden nur Ideen-Texte, Interessen, Anlassname, Budget
+ * und eine freiwillig gewaehlte Altersgruppe, keine weiteren Personendaten. Prompt-Aufbau und Antwortpruefung sind ohne Netzwerk
  * testbar.
  */
 class Ideengenerator
@@ -23,6 +23,16 @@ class Ideengenerator
         'ueber_100' => 'über 100 €',
     ];
 
+    /** Grobe Gruppen statt Alter oder Freitext; "keine" landet nicht im Prompt. */
+    public const ALTERSGRUPPEN = [
+        'keine' => 'Keine Angabe',
+        'kleinkind' => 'Kleinkind (0 bis 3 Jahre)',
+        'kind' => 'Kind (4 bis 12 Jahre)',
+        'jugendlich' => 'Jugendliche (13 bis 17 Jahre)',
+        'erwachsen' => 'Erwachsene (18 bis 64 Jahre)',
+        'senior' => 'Senioren (ab 65 Jahre)',
+    ];
+
     /** Weniger Ideen und keine Interessen: Seite weist darauf hin, dass Interessen helfen. */
     private const MINDESTANZAHL_IDEEN = 3;
 
@@ -38,7 +48,8 @@ class Ideengenerator
         array $beispiele,
         array $interessen = [],
         ?string $anlass = null,
-        string $budget = 'egal'
+        string $budget = 'egal',
+        string $altersgruppe = 'keine'
     ): ?array
     {
         self::$letzteAnfrage = null;
@@ -49,7 +60,7 @@ class Ideengenerator
             return null;
         }
 
-        $inhalt = self::anfrageSenden($apiKey, self::promptAufbauen($beispiele, $interessen, $anlass, $budget));
+        $inhalt = self::anfrageSenden($apiKey, self::promptAufbauen($beispiele, $interessen, $anlass, $budget, $altersgruppe));
         if ($inhalt === null) {
             return null;
         }
@@ -77,7 +88,8 @@ class Ideengenerator
         array $beispiele,
         array $interessen = [],
         ?string $anlass = null,
-        string $budget = 'egal'
+        string $budget = 'egal',
+        string $altersgruppe = 'keine'
     ): string {
         $angaben = [];
 
@@ -100,6 +112,10 @@ class Ideengenerator
             $angaben[] = 'Budget: ' . self::BUDGETS[$budget] . '.';
         }
 
+        if ($altersgruppe !== 'keine' && isset(self::ALTERSGRUPPEN[$altersgruppe])) {
+            $angaben[] = 'Altersgruppe: ' . self::ALTERSGRUPPEN[$altersgruppe] . '.';
+        }
+
         // Keine echten Beispielprodukte im Prompt: das Modell hat sie sonst einfach uebernommen.
         // Die Regeln verhindern erfundene Kombiprodukte und reine Verbrauchsartikel.
         return "Folgendes ist über eine Person bekannt, für die ein Geschenk gesucht wird:\n\n"
@@ -108,7 +124,8 @@ class Ideengenerator
             . 'konkretes Erlebnis. Kombiniere nicht mehrere Interessen künstlich zu einem erfundenen '
             . 'Produkt - jeder Vorschlag darf zu einem einzelnen Interesse passen. Wähle etwas, das '
             . 'sich als persönliches Geschenk eignet, keine reinen Verbrauchs- oder Zubehörartikel. '
-            . 'Halte ein angegebenes Budget ein.'
+            . 'Halte ein angegebenes Budget ein. Ist eine Altersgruppe angegeben, muss jeder Vorschlag '
+            . 'für dieses Alter geeignet sein.'
             . "\n\nSchlage darauf basierend genau drei NEUE, zu diesen Angaben passende Geschenkideen "
             . 'vor, die noch nicht in einer Liste oben stehen. Ein Vorschlag ist ein kurzer, konkreter '
             . 'Produkt- oder Geschenkname auf Deutsch - er kann aus einem einzelnen Wort oder aus '
