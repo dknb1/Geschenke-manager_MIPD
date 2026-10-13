@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/login-pflicht.php';
 require_once __DIR__ . '/../backend/models/Person.php';
 require_once __DIR__ . '/../backend/models/Ruecksprung.php';
 

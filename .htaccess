@@ -1,0 +1,3 @@
+# Von aussen ist nur frontend/ erreichbar (eigene .htaccess dort). Alles andere, z. B. .env,
+# Datenbank und Backend-Code, ist gesperrt.
+Require all denied

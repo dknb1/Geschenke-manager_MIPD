@@ -12,7 +12,7 @@ class Anlass
     ];
 
     /** Sortiert nach dem naechsten Termin, nicht nach dem gespeicherten Datum. */
-    public static function alle(): array
+    public static function alle(?DateTimeImmutable $heute = null): array
     {
         $pdo = Datenbank::verbinden();
         $stmt = $pdo->query('SELECT * FROM anlaesse');
@@ -20,18 +20,18 @@ class Anlass
 
         usort(
             $anlaesse,
-            fn (array $a, array $b) => self::naechstesVorkommen($a) <=> self::naechstesVorkommen($b)
+            fn (array $a, array $b) => self::naechstesVorkommen($a, $heute) <=> self::naechstesVorkommen($b, $heute)
         );
 
         return $anlaesse;
     }
 
     /** Alle Anlaesse plus die Geburtstage aller Personen, nach naechstem Termin sortiert. */
-    public static function alleInklGeburtstage(): array
+    public static function alleInklGeburtstage(?DateTimeImmutable $heute = null): array
     {
         $anlaesse = array_map(
             static fn (array $a): array => $a + ['ist_geburtstag' => false, 'person_id' => null],
-            self::alle()
+            self::alle($heute)
         );
         $geburtstage = array_map(
             static fn (array $p): array => Person::geburtstagAlsAnlass($p),
@@ -41,7 +41,7 @@ class Anlass
 
         usort(
             $alle,
-            fn (array $a, array $b) => self::naechstesVorkommen($a) <=> self::naechstesVorkommen($b)
+            fn (array $a, array $b) => self::naechstesVorkommen($a, $heute) <=> self::naechstesVorkommen($b, $heute)
         );
 
         return $alle;

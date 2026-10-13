@@ -1,6 +1,6 @@
 <?php
-// Die Zustimmung zur Datenuebertragung gilt nur fuer diese Browser-Sitzung.
-session_start();
+// Startet auch die Session; die Zustimmung zur Datenuebertragung gilt nur fuer diese Sitzung.
+require_once __DIR__ . '/includes/login-pflicht.php';
 
 require_once __DIR__ . '/../backend/models/Anlass.php';
 require_once __DIR__ . '/../backend/models/Person.php';

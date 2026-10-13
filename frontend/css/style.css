@@ -147,6 +147,8 @@ a.aktions-button:hover { background: var(--accent-dark); border-color: var(--acc
 .back-button {
     cursor: pointer;
 }
+.abmelden-formular { margin: 0; }
+.login-seite { max-width: 420px; }
 
 .home-button:hover,
 .back-button:hover {
@@ -400,8 +402,8 @@ a.aktions-button:hover { background: var(--accent-dark); border-color: var(--acc
     .startseite-aktionen a { padding: 11px; }
     .benachrichtigungs-fenster { top: 80px; }
 }
-/* Sehr schmale Handys: mit Zurück-Button passt der Schriftzug neben den Buttons nicht mehr. */
-@media (max-width: 380px) {
+/* Schmale Handys: mit Zurück- und Abmelden-Button passt der Schriftzug nicht mehr daneben. */
+@media (max-width: 430px) {
     .logo-text { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { a, summary { transition: none; } }

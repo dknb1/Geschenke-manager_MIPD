@@ -128,6 +128,10 @@ $navBenachrichtigungsAnzahl =
 
         <a href="index.php" class="home-button">Home</a>
 
+        <form method="post" action="logout.php" class="abmelden-formular">
+            <button type="submit" class="home-button">Abmelden</button>
+        </form>
+
     </div>
 
 </nav>

@@ -1,0 +1,2 @@
+# Bausteine fuer andere Seiten, nicht direkt aufrufbar (z. B. Navbar ohne Login).
+Require all denied

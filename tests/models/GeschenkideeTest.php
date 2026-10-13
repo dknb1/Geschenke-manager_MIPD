@@ -99,6 +99,14 @@ final class GeschenkideeTest extends ModelTestCase
         $this->assertFalse(Geschenkidee::istGueltigeUrl('kein-link'));
     }
 
+    public function testIstGueltigeUrlErlaubtNurHttpUndHttps(): void
+    {
+        $this->assertTrue(Geschenkidee::istGueltigeUrl('HTTP://example.com'));
+        $this->assertFalse(Geschenkidee::istGueltigeUrl('javascript://x%0Aalert(1)'));
+        $this->assertFalse(Geschenkidee::istGueltigeUrl('data://text/html,abc'));
+        $this->assertFalse(Geschenkidee::istGueltigeUrl('ftp://example.com/datei'));
+    }
+
     public function testFindenGibtNullZurueckWennNichtVorhanden(): void
     {
         $this->assertNull(Geschenkidee::finden(999));

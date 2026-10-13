@@ -532,7 +532,12 @@ class Geschenkidee
 
     public static function istGueltigeUrl(string $url): bool
     {
-        return $url === '' || (strlen($url) <= 2000 && filter_var($url, FILTER_VALIDATE_URL) !== false);
+        // Nur http(s): filter_var laesst sonst z. B. "javascript://...%0Aalert(1)" als Link durch.
+        return $url === '' || (
+            strlen($url) <= 2000
+            && filter_var($url, FILTER_VALIDATE_URL) !== false
+            && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)
+        );
     }
 
     /** Sammelt die Fehlermeldungen fuer das Ideen-Formular (leer = gueltig). */

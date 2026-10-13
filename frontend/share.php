@@ -4,7 +4,7 @@ require_once __DIR__ . '/../backend/models/Geschenkidee.php';
 
 // Oeffentliche Seite ohne Login, geschuetzt nur durch den Link-Schluessel. Zeigt offene und
 // festgelegte Geschenke, keine vergangenen.
-$token = trim($_GET['token'] ?? '');
+$token = is_string($_GET['token'] ?? null) ? trim($_GET['token']) : '';
 $person = Person::findenPerShareToken($token);
 
 $offeneGeschenkideen = [];

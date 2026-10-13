@@ -1,0 +1,2 @@
+# Zusaetzlich gesperrt, falls der Ordner ohne die .htaccess im Projektordner hochgeladen wird.
+Require all denied

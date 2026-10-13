@@ -80,7 +80,7 @@ class AnlassFilter
 
         $ergebnis = [];
 
-        foreach (Anlass::alleInklGeburtstage() as $anlass) {
+        foreach (Anlass::alleInklGeburtstage($heute) as $anlass) {
             $art = self::art($anlass);
             $datum = Anlass::naechstesVorkommen($anlass, $heute);
             $vergangen = $datum < $heute;
